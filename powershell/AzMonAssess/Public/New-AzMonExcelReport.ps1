@@ -75,10 +75,17 @@ function Add-AzMonExcelSummarySheet {
     $sevCounts = @{ critical = 0; high = 0; medium = 0; low = 0; info = 0 }
     $catCounts = @{}
     foreach ($f in $findings) {
-        $sevCounts[$f['Severity']] = ($sevCounts[$f['Severity']] ?? 0) + 1
-        $catCounts[$f['Category']] = ($catCounts[$f['Category']] ?? 0) + 1
+        # Coalesce to a non-null key first: indexing a hashtable with a
+        # $null key throws "index operation failed; the array index
+        # evaluated to null" — a finding reloaded from an older or
+        # hand-edited snapshot.json can legitimately be missing these
+        # fields even though New-AzMonFinding enforces them at creation.
+        $sevKey = $f['Severity'] ?? 'info'
+        $catKey = $f['Category'] ?? 'unknown'
+        $sevCounts[$sevKey] = ($sevCounts[$sevKey] ?? 0) + 1
+        $catCounts[$catKey] = ($catCounts[$catKey] ?? 0) + 1
     }
-    $generatedAt = [datetime]$Snapshot['GeneratedAt']
+    $generatedAt = if ($Snapshot['GeneratedAt']) { [datetime]$Snapshot['GeneratedAt'] } else { Get-Date }
 
     $ws = Add-AzMonXlsxSheet -Workbook $Workbook -Name 'Summary'
 
@@ -139,7 +146,7 @@ function Add-AzMonExcelFindingsSheet {
             ($f['Recommendation'] ?? ''), [double]($f['EstimatedMonthlySavingsUsd'] ?? 0), [double]@($f['ResourceIds']).Count, $f['Id']
         )
         $rowNum = Add-AzMonXlsxRow -Sheet $ws -Cell $cells
-        Set-AzMonXlsxRowFill -Sheet $ws -Row $rowNum -ColumnCount 8 -Hex $script:AzMonSevFillHex[$f['Severity']]
+        Set-AzMonXlsxRowFill -Sheet $ws -Row $rowNum -ColumnCount 8 -Hex $script:AzMonSevFillHex[$f['Severity'] ?? '']
         Set-AzMonXlsxCellWrap -Sheet $ws -Row $rowNum -Column 4
         Set-AzMonXlsxCellWrap -Sheet $ws -Row $rowNum -Column 5
     }
@@ -191,7 +198,7 @@ function Add-AzMonExcelImpactedResourcesSheet {
             Set-AzMonXlsxCellWrap -Sheet $ws -Row $rowNum -Column 14
             Set-AzMonXlsxCellWrap -Sheet $ws -Row $rowNum -Column 17
             Set-AzMonXlsxCellWrap -Sheet $ws -Row $rowNum -Column 19
-            $impactFill = $script:AzMonSevFillHex[$f['Severity']]
+            $impactFill = $script:AzMonSevFillHex[$f['Severity'] ?? '']
             if ($impactFill) { $ws.Rows[$rowNum - 1].Cells[14].FillHex = $impactFill }
         }
     }

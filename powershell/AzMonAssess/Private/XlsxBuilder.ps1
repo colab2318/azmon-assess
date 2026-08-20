@@ -209,10 +209,18 @@ function Set-AzMonXlsxRowFill {
 }
 
 function Set-AzMonXlsxCellWrap {
+    <#
+    .NOTES
+        Local var is $rowObj — see note in Set-AzMonXlsxRowFill. Grows the
+        Cells list first (mirrors Set-AzMonXlsxHyperlink) so a Column past
+        the row's populated cell count doesn't throw an out-of-range error.
+    #>
     [CmdletBinding()]
     param([Parameter(Mandatory)] [hashtable] $Sheet, [Parameter(Mandatory)] [int] $Row, [Parameter(Mandatory)] [int] $Column)
-    $Sheet.Rows[$Row - 1].Cells[$Column - 1].WrapText = $true
-    $Sheet.Rows[$Row - 1].Cells[$Column - 1].VerticalTop = $true
+    $rowObj = $Sheet.Rows[$Row - 1]
+    while ($rowObj.Cells.Count -lt $Column) { $rowObj.Cells.Add((New-AzMonXlsxCell -Value $null -AsString)) }
+    $rowObj.Cells[$Column - 1].WrapText = $true
+    $rowObj.Cells[$Column - 1].VerticalTop = $true
 }
 
 function Set-AzMonXlsxHyperlink {

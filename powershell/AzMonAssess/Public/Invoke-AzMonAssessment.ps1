@@ -157,6 +157,7 @@ function Invoke-AzMonReportGeneration {
             Write-Host '[azmon-assess] report.xlsx written.' -ForegroundColor Green
         } catch {
             Write-Warning "Excel report skipped: $($_.Exception.Message)"
+            Write-Warning "  Stack: $($_.ScriptStackTrace -replace '\r?\n', ' <- ')"
         }
     }
     if ($reportAll -or $Report -contains 'pptx') {
@@ -165,6 +166,7 @@ function Invoke-AzMonReportGeneration {
             Write-Host '[azmon-assess] report.pptx written.' -ForegroundColor Green
         } catch {
             Write-Warning "PPTX report skipped: $($_.Exception.Message)"
+            Write-Warning "  Stack: $($_.ScriptStackTrace -replace '\r?\n', ' <- ')"
         }
     }
     if ($reportAll -or $Report -contains 'html') {
@@ -173,6 +175,7 @@ function Invoke-AzMonReportGeneration {
             Write-Host '[azmon-assess] report.html written.' -ForegroundColor Green
         } catch {
             Write-Warning "HTML report skipped: $($_.Exception.Message)"
+            Write-Warning "  Stack: $($_.ScriptStackTrace -replace '\r?\n', ' <- ')"
         }
     }
 }
