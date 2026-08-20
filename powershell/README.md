@@ -73,6 +73,29 @@ The first run only checks that `Az.Accounts` is available (it is, on Cloud
 Shell) and prompts you to `Connect-AzAccount` if you aren't already signed in.
 Nothing is ever installed automatically.
 
+### Assessing a different tenant (e.g., a customer tenant as a guest/consultant)
+
+Pass `-TenantId` to sign into that tenant specifically:
+
+```powershell
+./azmon-assess.ps1 run -Output ./out -TenantId <customer-tenant-id-or-domain>
+```
+
+If you're already signed into the right tenant (e.g., via `Connect-AzAccount
+-TenantId ...` run beforehand, or a cached session), the tool reuses that
+session as-is and `-TenantId` isn't needed. To be certain which tenant/
+subscriptions will be assessed before running a full scan, check first:
+
+```powershell
+Get-AzContext                                    # confirms signed-in tenant
+Get-AzSubscription -TenantId <tenant-id>          # lists subscriptions in that tenant
+./azmon-assess.ps1 run -Output ./out -TenantId <tenant-id> -SubscriptionId <sub-id-1>,<sub-id-2>
+```
+
+`-SubscriptionId` (or `-ManagementGroupId`) scopes the assessment explicitly;
+omitting both auto-discovers every subscription the signed-in identity can
+see in that tenant.
+
 ## Commands
 
 All commands go through `./azmon-assess.ps1 <command> [options]`.

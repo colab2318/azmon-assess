@@ -39,6 +39,7 @@ param(
     [Alias('o')] [string] $Output = './out',
     [string[]] $SubscriptionId,
     [string] $ManagementGroupId,
+    [string] $TenantId,
     [string] $CustomerName,
     [string] $AoaiEndpoint,
     [string] $AoaiDeployment,
@@ -72,7 +73,7 @@ Import-Module (Join-Path $PSScriptRoot 'AzMonAssess/AzMonAssess.psd1') -Force
 $azureCommands = @('run', 'consolidate', 'gaps', 'alerts', 'cost', 'tracing', 'reliability', 'security', 'performance', 'remediate')
 if ($Command -in $azureCommands) {
     Initialize-AzMonPrerequisite
-    Connect-AzMonSession | Out-Null
+    Connect-AzMonSession -TenantId $TenantId | Out-Null
 }
 
 function Invoke-LocalAssessment {
@@ -110,7 +111,7 @@ switch ($Command) {
     'summarize' {
         if (-not $Snapshot) { throw '-Snapshot is required for the summarize command.' }
         Initialize-AzMonPrerequisite
-        Connect-AzMonSession | Out-Null
+        Connect-AzMonSession -TenantId $TenantId | Out-Null
         $snap = Import-AzMonSnapshot -Path $Snapshot
         $snap['AiSummary'] = New-AzMonAiSummary -Snapshot $snap -AoaiEndpoint $AoaiEndpoint -AoaiDeployment $AoaiDeployment -AoaiApiVersion $AoaiApiVersion
         Save-AzMonSnapshot -Snapshot $snap -Path (Join-Path $Output 'snapshot.json') | Out-Null
