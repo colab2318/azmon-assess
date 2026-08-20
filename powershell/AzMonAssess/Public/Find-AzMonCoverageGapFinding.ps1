@@ -6,7 +6,12 @@ $script:AzMonCriticalDiagnosticTypes = @(
     'microsoft.dbformysql/flexibleservers', 'microsoft.storage/storageaccounts', 'microsoft.network/networksecuritygroups',
     'microsoft.network/applicationgateways', 'microsoft.containerservice/managedclusters', 'microsoft.apimanagement/service',
     'microsoft.web/sites', 'microsoft.app/containerapps', 'microsoft.servicebus/namespaces', 'microsoft.eventhub/namespaces',
-    'microsoft.cache/redis'
+    'microsoft.cache/redis', 'microsoft.documentdb/databaseaccounts', 'microsoft.network/loadbalancers',
+    'microsoft.network/publicipaddresses', 'microsoft.network/azurefirewalls', 'microsoft.containerregistry/registries',
+    'microsoft.network/vpngateways', 'microsoft.network/virtualnetworkgateways', 'microsoft.network/expressroutecircuits',
+    'microsoft.recoveryservices/vaults', 'microsoft.automation/automationaccounts', 'microsoft.logic/workflows',
+    'microsoft.datafactory/factories', 'microsoft.network/bastionhosts', 'microsoft.cognitiveservices/accounts',
+    'microsoft.cdn/profiles'
 )
 $script:AzMonWebTypes = @('microsoft.web/sites', 'microsoft.app/containerapps')
 

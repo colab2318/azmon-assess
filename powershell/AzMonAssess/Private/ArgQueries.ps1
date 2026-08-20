@@ -98,7 +98,19 @@ resources
     'microsoft.servicebus/namespaces',
     'microsoft.eventhub/namespaces',
     'microsoft.cache/redis',
-    'microsoft.apimanagement/service'
+    'microsoft.apimanagement/service',
+    'microsoft.network/azurefirewalls',
+    'microsoft.containerregistry/registries',
+    'microsoft.network/vpngateways',
+    'microsoft.network/virtualnetworkgateways',
+    'microsoft.network/expressroutecircuits',
+    'microsoft.recoveryservices/vaults',
+    'microsoft.automation/automationaccounts',
+    'microsoft.logic/workflows',
+    'microsoft.datafactory/factories',
+    'microsoft.network/bastionhosts',
+    'microsoft.cognitiveservices/accounts',
+    'microsoft.cdn/profiles'
   )
 | project id, name, type, subscriptionId, resourceGroup, location, tags
 '@
