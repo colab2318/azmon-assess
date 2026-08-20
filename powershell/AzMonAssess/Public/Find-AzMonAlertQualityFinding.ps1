@@ -121,5 +121,45 @@ function Find-AzMonAlertQualityFinding {
             -Evidence @{ uncovered = @($uncovered | ForEach-Object { @{ type = $_.Type; count = $_.Count; expected_alerts = $script:AzMonExpectedAlertsByType[$_.Type] } }) }))
     }
 
+    # ---- Cost: metric alert rules scoped to very many resources ---------
+    # A metric alert rule that fans out across many resources of the same
+    # type scales its evaluation cost with the resource count (WAF: "when
+    # using metric alerts, minimize the number of resources being monitored").
+    $broadScopeThreshold = 20
+    $broadScope = @($AlertRule | Where-Object { $_['AlertKind'] -eq 'metric' -and $_['Enabled'] -and @($_['Scopes']).Count -ge $broadScopeThreshold } | Sort-Object -Property { - @($_['Scopes']).Count })
+    if ($broadScope.Count -gt 0) {
+        $findings.Add((New-AzMonFinding -Category 'alerting' -Severity 'low' `
+            -Title "$($broadScope.Count) metric alert rules are scoped to $broadScopeThreshold+ resources" `
+            -Detail ('Metric alert rules bill and evaluate per monitored resource-metric-dimension combination, ' +
+                'so very broad rules can become a meaningful cost driver. A log search alert against the same ' +
+                'resources is often cheaper at this scale.') `
+            -ResourceIds @($broadScope | ForEach-Object { $_['Id'] }) `
+            -Recommendation ('Review the widest-scoped rules first: split by criticality tier, reduce the scope ' +
+                'to only resources that need this exact threshold, or replace with a log search alert over the ' +
+                'same resource set.') `
+            -Evidence @{ top_broad_rules = @($broadScope | Select-Object -First 10 | ForEach-Object { @{ name = $_['Name']; scope_count = @($_['Scopes']).Count } }) }))
+    }
+
+    # ---- Cost: high-frequency log search (scheduled query) alerts -------
+    # "When using log search alerts, minimize log search alert frequency" -
+    # more frequent evaluation directly increases the per-rule cost.
+    $highFreqThresholdMinutes = 5.0
+    $highFreqLogAlerts = @($AlertRule | Where-Object {
+            $_['AlertKind'] -eq 'log' -and $_['Enabled'] -and $null -ne $_['EvaluationFrequencyMinutes'] -and
+            [double]$_['EvaluationFrequencyMinutes'] -le $highFreqThresholdMinutes
+        } | Sort-Object -Property { [double]$_['EvaluationFrequencyMinutes'] })
+    if ($highFreqLogAlerts.Count -gt 0) {
+        $findings.Add((New-AzMonFinding -Category 'alerting' -Severity 'low' `
+            -Title "$($highFreqLogAlerts.Count) log search alerts evaluate every $highFreqThresholdMinutes minutes or less" `
+            -Detail ('Log search (scheduled query) alerts are billed and executed on every evaluation cycle, so ' +
+                'sub-5-minute frequency on rules that do not need near-real-time detection is a direct, avoidable ' +
+                'cost driver.') `
+            -ResourceIds @($highFreqLogAlerts | ForEach-Object { $_['Id'] }) `
+            -Recommendation ('For each rule, confirm whether the monitored condition truly needs evaluation this ' +
+                'often; increase evaluationFrequency (e.g., to 15 or 30 minutes) where a slower detection time is ' +
+                'acceptable.') `
+            -Evidence @{ rules = @($highFreqLogAlerts | Select-Object -First 10 | ForEach-Object { @{ name = $_['Name']; frequency_minutes = $_['EvaluationFrequencyMinutes'] } }) }))
+    }
+
     return $findings.ToArray()
 }

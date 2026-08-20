@@ -106,6 +106,25 @@ function Test-AzMonProdTag {
     return (([string]$envTag).ToLowerInvariant()) -in @('prod', 'production', 'prd')
 }
 
+function ConvertFrom-AzMonIso8601Duration {
+    <#
+    .SYNOPSIS
+        Parses a simple ISO 8601 duration (as used by evaluationFrequency /
+        windowSize on scheduled query rules, e.g. 'PT5M', 'PT1H') into total
+        minutes. Returns $null if the input is empty or unparseable.
+    #>
+    [CmdletBinding()]
+    param([string] $Duration)
+    if ([string]::IsNullOrWhiteSpace($Duration)) { return $null }
+    $m = [regex]::Match($Duration, '^P(?:(?<days>\d+)D)?(?:T(?:(?<hours>\d+)H)?(?:(?<minutes>\d+)M)?(?:(?<seconds>\d+)S)?)?$')
+    if (-not $m.Success) { return $null }
+    $days = if ($m.Groups['days'].Success) { [double]$m.Groups['days'].Value } else { 0 }
+    $hours = if ($m.Groups['hours'].Success) { [double]$m.Groups['hours'].Value } else { 0 }
+    $minutes = if ($m.Groups['minutes'].Success) { [double]$m.Groups['minutes'].Value } else { 0 }
+    $seconds = if ($m.Groups['seconds'].Success) { [double]$m.Groups['seconds'].Value } else { 0 }
+    return ($days * 1440) + ($hours * 60) + $minutes + ($seconds / 60.0)
+}
+
 $script:AzMonAlertKindType = @{
     metric      = 'microsoft.insights/metricalerts'
     log         = 'microsoft.insights/scheduledqueryrules'

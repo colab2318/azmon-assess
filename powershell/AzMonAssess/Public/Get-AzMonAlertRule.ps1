@@ -49,9 +49,10 @@ function Get-AzMonAlertRule {
         foreach ($r in $rows) {
             $scopes = ConvertTo-AzMonHashtable $r.scopes
             if ($scopes -isnot [array]) { $scopes = if ($scopes) { @($scopes) } else { @() } }
+            $evalFreq = if ($q.Kind -eq 'log') { ConvertFrom-AzMonIso8601Duration -Duration $r.evaluationFrequency } else { $null }
             $rules.Add((New-AzMonAlertRule -Id $r.id -Name $r.name -SubscriptionId $r.subscriptionId -ResourceGroup $r.resourceGroup `
                 -AlertKind $q.Kind -Enabled ([bool]$r.enabled) -Severity $r.severity -Scopes $scopes `
-                -ActionGroupIds (ConvertTo-AzMonActionGroupId $r.actions) -Description $r.description))
+                -ActionGroupIds (ConvertTo-AzMonActionGroupId $r.actions) -Description $r.description -EvaluationFrequencyMinutes $evalFreq))
         }
     }
     return $rules.ToArray()

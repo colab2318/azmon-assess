@@ -18,6 +18,8 @@
         'Get-AzMonResource'
         'Get-AzMonDiagnosticSetting'
         'Get-AzMonDataCollectionRule'
+        'Get-AzMonVmAgentExtension'
+        'Get-AzMonAdvisorRecommendation'
         'Find-AzMonConsolidationFinding'
         'Find-AzMonCoverageGapFinding'
         'Find-AzMonAlertQualityFinding'

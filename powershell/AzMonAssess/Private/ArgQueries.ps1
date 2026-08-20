@@ -50,7 +50,8 @@ resources
           severity = toint(properties.severity),
           scopes = properties.scopes,
           actions = properties.actions,
-          description = tostring(properties.description)
+          description = tostring(properties.description),
+          evaluationFrequency = tostring(properties.evaluationFrequency)
 '@
 
 $script:AzMonQActivityAlerts = @'
@@ -111,6 +112,19 @@ resources
           storageAccountId = tostring(properties.storageAccountId),
           eventHubAuthorizationRuleId = tostring(properties.eventHubAuthorizationRuleId),
           logs = properties.logs, metrics = properties.metrics
+'@
+
+# VM extensions — used to detect the retired Log Analytics agent (MMA/OMS:
+# MicrosoftMonitoringAgent / OmsAgentForLinux) vs. Azure Monitor Agent
+# (AzureMonitorWindowsAgent / AzureMonitorLinuxAgent). Extensions are child
+# resources; vmId is derived by trimming the '/extensions/<name>' suffix.
+$script:AzMonQVmExtensions = @'
+resources
+| where type =~ 'microsoft.compute/virtualmachines/extensions'
+| extend vmId = tostring(split(id, '/extensions/')[0])
+| project id, vmId, name, subscriptionId, resourceGroup,
+          extensionType = tostring(properties.type),
+          publisher = tostring(properties.publisher)
 '@
 
 $script:AzMonQDataCollectionRules = @'

@@ -103,21 +103,23 @@ function New-AzMonAlertRule {
         [string[]] $Scopes = @(),
         [string[]] $ActionGroupIds = @(),
         [string] $Description,
-        [Nullable[int]] $FireCount30d
+        [Nullable[int]] $FireCount30d,
+        [Nullable[double]] $EvaluationFrequencyMinutes
     )
     @{
-        Kind           = 'AlertRule'
-        Id             = $Id
-        Name           = $Name
-        SubscriptionId = $SubscriptionId
-        ResourceGroup  = $ResourceGroup
-        AlertKind      = $AlertKind
-        Enabled        = $Enabled
-        Severity       = $Severity
-        Scopes         = @($Scopes)
-        ActionGroupIds = @($ActionGroupIds)
-        Description    = $Description
-        FireCount30d   = $FireCount30d
+        Kind                       = 'AlertRule'
+        Id                         = $Id
+        Name                       = $Name
+        SubscriptionId             = $SubscriptionId
+        ResourceGroup              = $ResourceGroup
+        AlertKind                  = $AlertKind
+        Enabled                    = $Enabled
+        Severity                   = $Severity
+        Scopes                     = @($Scopes)
+        ActionGroupIds             = @($ActionGroupIds)
+        Description                = $Description
+        FireCount30d               = $FireCount30d
+        EvaluationFrequencyMinutes = $EvaluationFrequencyMinutes
     }
 }
 

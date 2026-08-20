@@ -65,6 +65,14 @@ function Invoke-AzMonAssessment {
     $heartbeatResourceIds = Get-AzMonHeartbeatResourceId -Workspace $workspaces -ThrottleLimit $ThrottleLimit
     Write-Host "[azmon-assess] Found heartbeat for $($heartbeatResourceIds.Count) resource(s)." -ForegroundColor DarkCyan
 
+    Write-Host '[azmon-assess] Collecting VM monitoring agent extensions...' -ForegroundColor DarkCyan
+    $vmAgentExtensions = Get-AzMonVmAgentExtension -SubscriptionId $subs
+    Write-Host "[azmon-assess] Found $(@($vmAgentExtensions).Count) monitoring-agent extension(s)." -ForegroundColor DarkCyan
+
+    Write-Host '[azmon-assess] Collecting Azure Advisor cost recommendations...' -ForegroundColor DarkCyan
+    $advisorRecommendations = Get-AzMonAdvisorRecommendation -SubscriptionId $subs
+    Write-Host "[azmon-assess] Found $(@($advisorRecommendations).Count) Advisor cost recommendation(s)." -ForegroundColor DarkCyan
+
     $snapshot = New-AzMonSnapshotObject -SubscriptionId $subs -CustomerName $CustomerName `
         -Workspaces $workspaces -AppInsights $appInsights -AlertRules $alertRules `
         -ActionGroups $actionGroups -DiagnosticSettings $diagSettings -Resources $resources `
@@ -87,7 +95,7 @@ function Invoke-AzMonAssessment {
     }
     if ($runAll -or $Only -contains 'cost') {
         Write-Host '[azmon-assess] Analyzing cost optimization...' -ForegroundColor DarkCyan
-        $findings.AddRange((Find-AzMonCostOptimizationFinding -Workspace $workspaces -AppInsight $appInsights))
+        $findings.AddRange((Find-AzMonCostOptimizationFinding -Workspace $workspaces -AppInsight $appInsights -VmAgentExtension $vmAgentExtensions -AdvisorRecommendation $advisorRecommendations))
     }
     if ($runAll -or $Only -contains 'tracing') {
         Write-Host '[azmon-assess] Analyzing tracing readiness...' -ForegroundColor DarkCyan

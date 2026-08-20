@@ -61,6 +61,15 @@ function New-AzMonDemoSnapshot {
                 -ResourceGroup 'rg' -AlertKind 'metric' -Enabled ($i % 3 -ne 0) -Severity 2 `
                 -Scopes @($workspaceArr[0]['Id']) -ActionGroupIds $agIds -FireCount30d $fireCount))
     }
+    # Exercises the broad-metric-scope cost finding (many resources on one rule).
+    $rules.Add((New-AzMonAlertRule -Id '/subscriptions/demo/rule-broad-scope' -Name 'rule-broad-scope' -SubscriptionId 'demo' `
+            -ResourceGroup 'rg' -AlertKind 'metric' -Enabled $true -Severity 3 `
+            -Scopes (1..25 | ForEach-Object { "/subscriptions/demo/rg/rg/providers/Microsoft.Compute/virtualMachines/fleet$_" }) `
+            -ActionGroupIds @('/subscriptions/demo/ag/ag-1')))
+    # Exercises the high-frequency log-search-alert cost finding.
+    $rules.Add((New-AzMonAlertRule -Id '/subscriptions/demo/rule-high-freq-log' -Name 'rule-high-freq-log' -SubscriptionId 'demo' `
+            -ResourceGroup 'rg' -AlertKind 'log' -Enabled $true -Severity 3 `
+            -Scopes @($workspaceArr[0]['Id']) -ActionGroupIds @('/subscriptions/demo/ag/ag-1') -EvaluationFrequencyMinutes 1))
 
     $actionGroups = @(
         (New-AzMonActionGroup -Id '/subscriptions/demo/ag/ag-1' -Name 'ag-1' -SubscriptionId 'demo' -ResourceGroup 'rg' -UsedByRules 15)
@@ -85,6 +94,31 @@ function New-AzMonDemoSnapshot {
     $heartbeatResourceIds = [System.Collections.Generic.HashSet[string]]::new()
     foreach ($vm in ($vms | Select-Object -First 3)) { [void]$heartbeatResourceIds.Add(([string]$vm['Id']).ToLowerInvariant()) }
 
+    # vm0: legacy agent only (exercises the retired-MMA-agent finding).
+    # vm1: Azure Monitor Agent only (already migrated, no finding).
+    # vm2: both agents present (mid-migration, no finding). vm3/vm4: neither.
+    $vmAgentExtensions = @(
+        @{ Kind = 'VmAgentExtension'; VmId = $vms[0]['Id']; AgentKind = 'legacy'; ExtensionType = 'MicrosoftMonitoringAgent'; SubscriptionId = 'demo'; ResourceGroup = 'rg' }
+        @{ Kind = 'VmAgentExtension'; VmId = $vms[1]['Id']; AgentKind = 'ama'; ExtensionType = 'AzureMonitorWindowsAgent'; SubscriptionId = 'demo'; ResourceGroup = 'rg' }
+        @{ Kind = 'VmAgentExtension'; VmId = $vms[2]['Id']; AgentKind = 'legacy'; ExtensionType = 'OmsAgentForLinux'; SubscriptionId = 'demo'; ResourceGroup = 'rg' }
+        @{ Kind = 'VmAgentExtension'; VmId = $vms[2]['Id']; AgentKind = 'ama'; ExtensionType = 'AzureMonitorLinuxAgent'; SubscriptionId = 'demo'; ResourceGroup = 'rg' }
+    )
+
+    # Exercises the Azure Advisor cost-recommendation finding.
+    $advisorRecommendations = @(
+        @{
+            Kind             = 'AdvisorRecommendation'
+            Id               = '/subscriptions/demo/providers/Microsoft.Advisor/recommendations/demo-1'
+            ResourceId       = $workspaceArr[0]['Id']
+            ImpactedField    = 'microsoft.operationalinsights/workspaces'
+            Impact           = 'Medium'
+            Problem          = 'Consider configuring the cost effective Basic logs plan on selected tables'
+            Solution         = 'One or more tables are eligible for the low-cost Basic log data plan, which still supports query for debugging and troubleshooting.'
+            PotentialBenefit = 'Lower ingestion cost for eligible tables'
+            LearnMoreLink    = 'https://learn.microsoft.com/azure/azure-monitor/logs/logs-table-plans'
+        }
+    )
+
     $dcrs = @(
         (New-AzMonDataCollectionRule -Id '/subscriptions/demo/rg/rg/providers/Microsoft.Insights/dataCollectionRules/dcr-vm-perf' `
                 -Name 'dcr-vm-perf' -SubscriptionId 'demo' -ResourceGroup 'rg' -Location 'eastus' `
@@ -102,7 +136,7 @@ function New-AzMonDemoSnapshot {
     $snapshot['Findings'] += Find-AzMonConsolidationFinding -Workspace $workspaceArr
     $snapshot['Findings'] += Find-AzMonCoverageGapFinding -ResourceRef $resources.ToArray() -DiagnosticSetting @() -Workspace $workspaceArr -AppInsight $appInsights -HeartbeatResourceId $heartbeatResourceIds
     $snapshot['Findings'] += Find-AzMonAlertQualityFinding -AlertRule $rules.ToArray() -ActionGroup $actionGroups -ResourceRef $resources.ToArray()
-    $snapshot['Findings'] += Find-AzMonCostOptimizationFinding -Workspace $workspaceArr -AppInsight $appInsights
+    $snapshot['Findings'] += Find-AzMonCostOptimizationFinding -Workspace $workspaceArr -AppInsight $appInsights -VmAgentExtension $vmAgentExtensions -AdvisorRecommendation $advisorRecommendations
     $snapshot['Findings'] += Find-AzMonTracingFinding -ResourceRef $resources.ToArray() -AppInsight $appInsights
     $snapshot['Findings'] += Find-AzMonReliabilityFinding -Workspace $workspaceArr -AppInsight $appInsights -AlertRule $rules.ToArray() -DiagnosticSetting @() -ResourceRef $resources.ToArray()
     $snapshot['Findings'] += Find-AzMonSecurityFinding -Workspace $workspaceArr -AppInsight $appInsights

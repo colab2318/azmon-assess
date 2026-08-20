@@ -10,7 +10,9 @@ function Find-AzMonCostOptimizationFinding {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] [AllowEmptyCollection()] [array] $Workspace,
-        [Parameter(Mandatory)] [AllowEmptyCollection()] [array] $AppInsight
+        [Parameter(Mandatory)] [AllowEmptyCollection()] [array] $AppInsight,
+        [array] $VmAgentExtension = @(),
+        [array] $AdvisorRecommendation = @()
     )
     $findings = [System.Collections.Generic.List[hashtable]]::new()
 
@@ -126,6 +128,81 @@ function Find-AzMonCostOptimizationFinding {
                 'AppServiceHTTPLogs per status/route). Retain rollups in Analytics tier and raw data in Basic + ' +
                 'storage archive.') `
             -Evidence @{ tables = @($summaryCandidates | ForEach-Object { , @($_.Table, $_.Gb) }) }))
+    }
+
+    # ---- Retired Log Analytics agent (MMA/OMS) still installed ---------
+    # Retired 2024-08-31; cloud ingestion for it is being shut down and can
+    # stop at any time without notice after 2026-03-02. Flag any VM that has
+    # the legacy extension without also having Azure Monitor Agent installed
+    # (both present briefly during a migration is expected, not a finding).
+    $agentKindsByVm = @{}
+    foreach ($ext in $VmAgentExtension) {
+        $vid = ([string]$ext['VmId']).ToLowerInvariant()
+        if (-not $agentKindsByVm.ContainsKey($vid)) { $agentKindsByVm[$vid] = [System.Collections.Generic.HashSet[string]]::new() }
+        [void]$agentKindsByVm[$vid].Add($ext['AgentKind'])
+    }
+    $legacyOnlyVmIds = @($agentKindsByVm.Keys | Where-Object { $agentKindsByVm[$_].Contains('legacy') -and -not $agentKindsByVm[$_].Contains('ama') })
+    if ($legacyOnlyVmIds.Count -gt 0) {
+        $findings.Add((New-AzMonFinding -Category 'cost' -Severity 'critical' `
+            -Title "$($legacyOnlyVmIds.Count) VMs still run the retired Log Analytics agent (MMA/OMS) with no Azure Monitor Agent" `
+            -Detail ('The Log Analytics agent (MMA/OMS) was retired on 2024-08-31. Microsoft no longer supports it, ' +
+                'it receives no new distros/service packs, and cloud ingestion for it is being shut down - after ' +
+                '2026-03-02, data upload from this agent can stop at any time without further notice. Every VM ' +
+                'still on it alone is one silent outage away from a monitoring blind spot, and running two agent ' +
+                'generations side by side (during migration) doubles ingestion cost until the legacy agent is removed.') `
+            -ResourceIds $legacyOnlyVmIds `
+            -Recommendation ('Migrate to Azure Monitor Agent: use the Migration Helper workbook to inventory ' +
+                'remaining agents, generate data collection rules with the DCR Config Generator, deploy AMA via ' +
+                'Azure Policy, validate ingestion, then remove the legacy agent with the MMA Discovery and Removal ' +
+                'tool. See https://learn.microsoft.com/azure/azure-monitor/agents/azure-monitor-agent-migration') `
+            -Evidence @{ vm_count = $legacyOnlyVmIds.Count }))
+    }
+
+    # ---- Standalone workspace - commitment tier opportunity -------------
+    # The consolidation analyzer only prices a commitment tier for groups of
+    # 2+ workspaces sharing a region/environment; a single large workspace
+    # with no consolidation peers would otherwise never get this check.
+    $groupSizeByKey = @{}
+    foreach ($ws in $Workspace) {
+        $key = "$(([string]$ws['Location']).ToLowerInvariant())|$(Get-AzMonEnvironmentTag -Workspace $ws)"
+        $groupSizeByKey[$key] = ($groupSizeByKey[$key] ?? 0) + 1
+    }
+    foreach ($ws in $Workspace) {
+        $key = "$(([string]$ws['Location']).ToLowerInvariant())|$(Get-AzMonEnvironmentTag -Workspace $ws)"
+        if ($groupSizeByKey[$key] -gt 1) { continue }
+        $dailyGb = [double]($ws['IngestionGb30d'] ?? 0) / 30.0
+        if ($dailyGb -lt 100) { continue }
+        $paygMo = $dailyGb * 30.0 * $script:AzMonPaygPricePerGb
+        $best = Get-AzMonBestCommitment -DailyGb $dailyGb
+        $savings = [Math]::Round([Math]::Max($paygMo - $best.MonthlyCost, 0), 2)
+        if ($savings -lt 100) { continue }
+        $findings.Add((New-AzMonFinding -Category 'cost' -Severity $(if ($savings -gt 500) { 'high' } else { 'medium' }) `
+            -Title "$($ws['Name']): $([Math]::Round($dailyGb,0)) GB/day on pay-as-you-go - commitment tier available" `
+            -Detail ('This workspace has no consolidation peers in its region/environment, so it would not ' +
+                'otherwise be flagged for a pricing-tier change. At its current volume, a commitment tier reduces ' +
+                "list price from $(Format-AzMonUsd $paygMo)/mo (PAYG) to $(Format-AzMonUsd $best.MonthlyCost)/mo.") `
+            -ResourceIds @($ws['Id']) -EstimatedMonthlySavingsUsd $savings `
+            -Recommendation ('Configure a commitment tier sized to this daily volume via az monitor log-analytics ' +
+                'workspace update --sku CapacityReservation --capacity-reservation-level <tier>. Use the Azure ' +
+                'Pricing Calculator to pick the closest tier at or below current daily GB, then re-check after ' +
+                '30 days of billing to confirm the fit.') `
+            -Evidence @{ daily_gb = [Math]::Round($dailyGb, 2); price_per_gb = $best.PricePerGb }))
+    }
+
+    # ---- Azure Advisor cost recommendations (Monitor-scoped) ------------
+    # Surfaces the actual current Advisor recommendations rather than just
+    # checking whether an alert exists for future ones.
+    foreach ($rec in $AdvisorRecommendation) {
+        $impact = ([string]$rec['Impact'])
+        $sev = switch ($impact) { 'High' { 'high' } 'Medium' { 'medium' } default { 'low' } }
+        $benefitSuffix = if ($rec['PotentialBenefit']) { " Potential benefit: $($rec['PotentialBenefit'])" } else { '' }
+        $recommendation = if ($rec['LearnMoreLink']) { "See $($rec['LearnMoreLink'])" } else { 'Review this recommendation in Azure Advisor.' }
+        $findings.Add((New-AzMonFinding -Category 'cost' -Severity $sev `
+            -Title "Azure Advisor: $($rec['Problem'])" `
+            -Detail "$($rec['Solution'])$benefitSuffix" `
+            -ResourceIds @($rec['ResourceId']) `
+            -Recommendation $recommendation `
+            -Evidence @{ source = 'Azure Advisor'; impacted_field = $rec['ImpactedField'] }))
     }
 
     return $findings.ToArray()
