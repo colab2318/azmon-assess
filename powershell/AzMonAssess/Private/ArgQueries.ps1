@@ -187,9 +187,14 @@ function Invoke-AzMonGraphQuery {
         # ARG returns data:null (not data:[]) when a page has zero rows —
         # @($null) wraps that into a 1-element array *containing* null, so
         # guard on truthiness before wrapping/adding rather than on Count.
+        # Also strip any individual null rows ARG may include within an
+        # otherwise non-empty data array (seen in production, not just the
+        # whole-page-null case) — a null propagating into a collector's
+        # result silently breaks every downstream consumer that dereferences
+        # each row (e.g. "Cannot bind argument ... because it is null").
         if ($parsed.data) {
-            $rows = @($parsed.data)
-            $all.AddRange($rows)
+            $rows = @($parsed.data | Where-Object { $null -ne $_ })
+            if ($rows.Count -gt 0) { $all.AddRange($rows) }
         }
         $skipToken = $parsed.'$skipToken'
         $guard++

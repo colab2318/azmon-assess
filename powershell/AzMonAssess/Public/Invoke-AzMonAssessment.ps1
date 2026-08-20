@@ -79,39 +79,50 @@ function Invoke-AzMonAssessment {
         -DataCollectionRules $dataCollectionRules
 
     $runAll = $Only -contains 'all'
-    $findings = [System.Collections.Generic.List[hashtable]]::new()
+    # List[object], not List[hashtable]: @(Find-AzMonXFinding ...) on a
+    # zero-result call produces an untyped System.Object[], which
+    # List[hashtable].AddRange() refuses ("cannot convert ... to
+    # IEnumerable`1[Hashtable]") even though it's empty. List[object]
+    # accepts it unconditionally; ToArray() below still yields a plain
+    # array of the (hashtable) Finding objects for the snapshot.
+    $findings = [System.Collections.Generic.List[object]]::new()
 
+    # Every analyzer call below is wrapped in @(...): a PowerShell function
+    # that returns zero items collapses to $null on the pipeline (not an
+    # empty array), and List.AddRange($null) throws — a category that
+    # legitimately finds nothing must not silently break every category
+    # after it.
     if ($runAll -or $Only -contains 'consolidation') {
         Write-Host '[azmon-assess] Analyzing consolidation opportunities...' -ForegroundColor DarkCyan
-        $findings.AddRange((Find-AzMonConsolidationFinding -Workspace $workspaces))
+        $findings.AddRange(@(Find-AzMonConsolidationFinding -Workspace $workspaces))
     }
     if ($runAll -or $Only -contains 'coverage') {
         Write-Host '[azmon-assess] Analyzing coverage gaps...' -ForegroundColor DarkCyan
-        $findings.AddRange((Find-AzMonCoverageGapFinding -ResourceRef $resources -DiagnosticSetting $diagSettings -Workspace $workspaces -AppInsight $appInsights -HeartbeatResourceId $heartbeatResourceIds))
+        $findings.AddRange(@(Find-AzMonCoverageGapFinding -ResourceRef $resources -DiagnosticSetting $diagSettings -Workspace $workspaces -AppInsight $appInsights -HeartbeatResourceId $heartbeatResourceIds))
     }
     if ($runAll -or $Only -contains 'alerting') {
         Write-Host '[azmon-assess] Analyzing alert quality...' -ForegroundColor DarkCyan
-        $findings.AddRange((Find-AzMonAlertQualityFinding -AlertRule $alertRules -ActionGroup $actionGroups -ResourceRef $resources))
+        $findings.AddRange(@(Find-AzMonAlertQualityFinding -AlertRule $alertRules -ActionGroup $actionGroups -ResourceRef $resources))
     }
     if ($runAll -or $Only -contains 'cost') {
         Write-Host '[azmon-assess] Analyzing cost optimization...' -ForegroundColor DarkCyan
-        $findings.AddRange((Find-AzMonCostOptimizationFinding -Workspace $workspaces -AppInsight $appInsights -VmAgentExtension $vmAgentExtensions -AdvisorRecommendation $advisorRecommendations))
+        $findings.AddRange(@(Find-AzMonCostOptimizationFinding -Workspace $workspaces -AppInsight $appInsights -VmAgentExtension $vmAgentExtensions -AdvisorRecommendation $advisorRecommendations))
     }
     if ($runAll -or $Only -contains 'tracing') {
         Write-Host '[azmon-assess] Analyzing tracing readiness...' -ForegroundColor DarkCyan
-        $findings.AddRange((Find-AzMonTracingFinding -ResourceRef $resources -AppInsight $appInsights))
+        $findings.AddRange(@(Find-AzMonTracingFinding -ResourceRef $resources -AppInsight $appInsights))
     }
     if ($runAll -or $Only -contains 'reliability') {
         Write-Host '[azmon-assess] Analyzing reliability posture (WAF)...' -ForegroundColor DarkCyan
-        $findings.AddRange((Find-AzMonReliabilityFinding -Workspace $workspaces -AppInsight $appInsights -AlertRule $alertRules -DiagnosticSetting $diagSettings -ResourceRef $resources))
+        $findings.AddRange(@(Find-AzMonReliabilityFinding -Workspace $workspaces -AppInsight $appInsights -AlertRule $alertRules -DiagnosticSetting $diagSettings -ResourceRef $resources))
     }
     if ($runAll -or $Only -contains 'security') {
         Write-Host '[azmon-assess] Analyzing security posture (WAF)...' -ForegroundColor DarkCyan
-        $findings.AddRange((Find-AzMonSecurityFinding -Workspace $workspaces -AppInsight $appInsights))
+        $findings.AddRange(@(Find-AzMonSecurityFinding -Workspace $workspaces -AppInsight $appInsights))
     }
     if ($runAll -or $Only -contains 'performance') {
         Write-Host '[azmon-assess] Analyzing performance efficiency (WAF)...' -ForegroundColor DarkCyan
-        $findings.AddRange((Find-AzMonPerformanceFinding -Workspace $workspaces -AppInsight $appInsights))
+        $findings.AddRange(@(Find-AzMonPerformanceFinding -Workspace $workspaces -AppInsight $appInsights))
     }
     $snapshot['Findings'] = $findings.ToArray()
 
