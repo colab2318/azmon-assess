@@ -34,8 +34,13 @@ function Resolve-AzMonSubscription {
     }
 
     Write-Host '[azmon-assess] No subscriptions specified — auto-discovering...' -ForegroundColor Cyan
-    $subs = @(Get-AzSubscription -ErrorAction Stop | Where-Object { $_.State -eq 'Enabled' } | Select-Object -ExpandProperty Id)
-    Write-Host "[azmon-assess] Discovered $($subs.Count) subscription(s)." -ForegroundColor Cyan
+    # Get-AzSubscription with no -TenantId tries every tenant the signed-in
+    # identity has any access to (common for guest/B2B accounts), not just
+    # the tenant that's actually signed in — scope explicitly to avoid
+    # cross-tenant token failures and accidentally assessing other tenants.
+    $currentTenantId = (Get-AzContext).Tenant.Id
+    $subs = @(Get-AzSubscription -TenantId $currentTenantId -ErrorAction Stop | Where-Object { $_.State -eq 'Enabled' } | Select-Object -ExpandProperty Id)
+    Write-Host "[azmon-assess] Discovered $($subs.Count) subscription(s) in tenant $currentTenantId." -ForegroundColor Cyan
     return $subs
 }
 
