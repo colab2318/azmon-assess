@@ -122,7 +122,7 @@ function Add-AzMonExcelSummarySheet {
 
     if ($Snapshot['AiSummary']) {
         Add-AzMonXlsxRow -Sheet $ws -Cell @() | Out-Null
-        Add-AzMonXlsxRow -Sheet $ws -Cell @((New-AzMonXlsxCell -Value 'AI Executive Summary' -AsString -Bold -FontColorHex '6B21A8' -FontSizePt 13)) | Out-Null
+        Add-AzMonXlsxRow -Sheet $ws -Cell @((New-AzMonXlsxCell -Value 'Executive Summary' -AsString -Bold -FontColorHex '6B21A8' -FontSizePt 13)) | Out-Null
         $textRow = Add-AzMonXlsxRow -Sheet $ws -Cell @((New-AzMonXlsxCell -Value ([string]$Snapshot['AiSummary']) -AsString -WrapText -VerticalTop)) -HeightPt 300
         Merge-AzMonXlsxCells -Sheet $ws -Range "A$textRow`:F$textRow"
     }

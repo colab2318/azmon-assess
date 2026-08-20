@@ -33,7 +33,7 @@ function New-AzMonMarkdownReport {
     [void]$lines.Add('')
 
     if ($Snapshot['AiSummary']) {
-        [void]$lines.Add('## AI Executive Summary')
+        [void]$lines.Add('## Executive Summary')
         [void]$lines.Add('')
         [void]$lines.Add([string]$Snapshot['AiSummary'])
         [void]$lines.Add('')
