@@ -184,8 +184,13 @@ function Invoke-AzMonGraphQuery {
             throw "Azure Resource Graph query failed with status $($resp.StatusCode): $($resp.Content)"
         }
         $parsed = $resp.Content | ConvertFrom-Json
-        $rows = @($parsed.data)
-        if ($rows.Count -gt 0) { $all.AddRange($rows) }
+        # ARG returns data:null (not data:[]) when a page has zero rows —
+        # @($null) wraps that into a 1-element array *containing* null, so
+        # guard on truthiness before wrapping/adding rather than on Count.
+        if ($parsed.data) {
+            $rows = @($parsed.data)
+            $all.AddRange($rows)
+        }
         $skipToken = $parsed.'$skipToken'
         $guard++
     } while ($skipToken -and $guard -lt 1000)

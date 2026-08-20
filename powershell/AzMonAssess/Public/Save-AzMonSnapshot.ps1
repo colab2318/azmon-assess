@@ -23,5 +23,15 @@ function Import-AzMonSnapshot {
     [CmdletBinding()]
     param([Parameter(Mandatory)] [string] $Path)
     $raw = Get-Content -LiteralPath $Path -Raw
-    return ($raw | ConvertFrom-Json -AsHashtable -Depth 25)
+    $snap = $raw | ConvertFrom-Json -AsHashtable -Depth 25
+    # Heals snapshots saved before the Invoke-AzMonGraphQuery data:null fix
+    # (and guards against any other source of stray nulls): a null element
+    # in one of these arrays crashes any consumer that indexes it directly,
+    # e.g. report generation doing $s['LogsEnabled'].
+    foreach ($key in @('Workspaces', 'AppInsights', 'AlertRules', 'ActionGroups', 'DiagnosticSettings', 'Resources', 'DataCollectionRules', 'Findings')) {
+        if ($snap.ContainsKey($key)) {
+            $snap[$key] = @($snap[$key] | Where-Object { $null -ne $_ })
+        }
+    }
+    return $snap
 }
