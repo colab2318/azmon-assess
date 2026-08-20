@@ -1,0 +1,11 @@
+// App Insights sampling efficiency — how much telemetry is being dropped.
+// Run against a workspace-based App Insights component.
+AppRequests
+| where TimeGenerated > ago(1d)
+| summarize
+    Total = count(),
+    SampledIn = countif(isnotnull(ItemCount)),
+    AvgItemCount = avg(ItemCount)
+    by AppRoleName
+| extend EffectiveSampling = round(100.0 / AvgItemCount, 1)
+| order by Total desc

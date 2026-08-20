@@ -1,0 +1,8 @@
+// Alert rule fire rate — identifies noisy rules dominating on-call.
+AlertsManagementResources
+| where type =~ "microsoft.alertsmanagement/alerts"
+| where properties.essentials.startDateTime > ago(30d)
+| extend ruleName = tostring(properties.essentials.alertRule)
+| extend sev = tostring(properties.essentials.severity)
+| summarize FireCount = count() by ruleName, sev
+| top 30 by FireCount desc

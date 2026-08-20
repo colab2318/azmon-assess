@@ -1,0 +1,7 @@
+// Billable ingestion by table (last 30 days).
+// Run in any Log Analytics workspace.
+Usage
+| where TimeGenerated > ago(30d)
+| where IsBillable == true
+| summarize BillableGB = round(sum(Quantity) / 1024.0, 2) by DataType
+| order by BillableGB desc

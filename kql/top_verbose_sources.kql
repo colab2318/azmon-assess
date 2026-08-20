@@ -1,0 +1,7 @@
+// Top verbose sources — which resources are shipping the most log volume.
+// Useful when trimming ingestion cost.
+AzureDiagnostics
+| where TimeGenerated > ago(7d)
+| summarize CountRows = count(), ApproxMB = sum(strlen(tostring(pack_all()))) / 1024 / 1024
+    by ResourceProvider, Resource, Category
+| top 30 by ApproxMB desc

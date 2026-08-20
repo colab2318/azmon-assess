@@ -1,0 +1,8 @@
+// VM / Arc host coverage — which computers have NOT heartbeat in 24h.
+Heartbeat
+| where TimeGenerated > ago(2d)
+| summarize LastHeartbeat = max(TimeGenerated) by Computer, ResourceId
+| extend Stale = iff(LastHeartbeat < ago(1h), true, false)
+| where Stale
+| project Computer, ResourceId, LastHeartbeat
+| order by LastHeartbeat asc

@@ -1,0 +1,7 @@
+// End-to-end trace correlation — walks operation_Id across services.
+// Useful for validating OpenTelemetry / App Insights trace continuity.
+let opId = "REPLACE_WITH_OPERATION_ID";
+union isfuzzy=true AppRequests, AppDependencies, AppTraces, AppExceptions
+| where OperationId == opId
+| project TimeGenerated, ItemType = Type, AppRoleName, Name, Success, DurationMs, ResultCode
+| order by TimeGenerated asc

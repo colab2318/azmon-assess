@@ -1,0 +1,7 @@
+// Data cap approach — alert when a workspace nears its daily quota.
+Operation
+| where OperationCategory == "Ingestion"
+| where Detail startswith "The daily ingestion volume"
+| extend CapReached = extract("has reached ([0-9.]+)% of the daily cap", 1, Detail)
+| project TimeGenerated, CapReached
+| order by TimeGenerated desc
