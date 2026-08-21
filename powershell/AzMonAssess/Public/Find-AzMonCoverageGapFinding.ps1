@@ -59,7 +59,10 @@ function Find-AzMonCoverageGapFinding {
             } else {
                 $hasWsDest = $false
                 foreach ($s in $settings) {
-                    if ($s['WorkspaceId'] -and $wsIds.ContainsKey(([string]$s['WorkspaceId']).ToLowerInvariant())) { $hasWsDest = $true; break }
+                    # LogsEnabled matters: a setting can have a WorkspaceId
+                    # configured with only Metrics categories turned on,
+                    # sending zero log data despite "having a destination".
+                    if ($s['WorkspaceId'] -and $s['LogsEnabled'] -and $wsIds.ContainsKey(([string]$s['WorkspaceId']).ToLowerInvariant())) { $hasWsDest = $true; break }
                 }
                 if (-not $hasWsDest) { $notToWs.Add($r) }
             }
@@ -95,11 +98,13 @@ function Find-AzMonCoverageGapFinding {
 
     if ($notToWs.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'coverage' -Severity 'medium' `
-            -Title "$($notToWs.Count) resources have diagnostic settings but do NOT send to a Log Analytics workspace" `
+            -Title "$($notToWs.Count) resources have diagnostic settings but no Logs category reaching a Log Analytics workspace" `
             -Detail ('Storage-account-only or event-hub-only routing prevents correlation and alerting inside ' +
-                'Azure Monitor. Add a workspace destination.') `
+                'Azure Monitor. A setting can also have a workspace destination configured with only Metrics ' +
+                'categories enabled, sending zero log data despite appearing to have a workspace destination. ' +
+                'Add (or enable Logs on) a workspace destination.') `
             -ResourceIds @($notToWs | ForEach-Object { $_['Id'] }) `
-            -Recommendation 'Add a workspace destination to each diagnostic setting.' `
+            -Recommendation 'Add a workspace destination with Logs categories enabled to each diagnostic setting.' `
             -Evidence @{ by_type = Get-AzMonCountByType -ResourceRef $notToWs.ToArray() }))
     }
 
