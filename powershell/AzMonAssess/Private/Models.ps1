@@ -104,7 +104,9 @@ function New-AzMonAlertRule {
         [string[]] $ActionGroupIds = @(),
         [string] $Description,
         [Nullable[int]] $FireCount30d,
-        [Nullable[double]] $EvaluationFrequencyMinutes
+        [Nullable[double]] $EvaluationFrequencyMinutes,
+        [bool] $IsServiceHealthAlert = $false,
+        [bool] $HasDynamicThreshold = $false
     )
     @{
         Kind                       = 'AlertRule'
@@ -120,8 +122,11 @@ function New-AzMonAlertRule {
         Description                = $Description
         FireCount30d               = $FireCount30d
         EvaluationFrequencyMinutes = $EvaluationFrequencyMinutes
+        IsServiceHealthAlert       = $IsServiceHealthAlert
+        HasDynamicThreshold        = $HasDynamicThreshold
     }
 }
+
 
 function New-AzMonActionGroup {
     [CmdletBinding()]

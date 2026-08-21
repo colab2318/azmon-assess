@@ -39,7 +39,8 @@ resources
           severity = toint(properties.severity),
           scopes = properties.scopes,
           actions = properties.actions,
-          description = tostring(properties.description)
+          description = tostring(properties.description),
+          criteria = properties.criteria
 '@
 
 $script:AzMonQLogAlerts = @'
@@ -61,7 +62,16 @@ resources
           enabled = tobool(properties.enabled),
           scopes = properties.scopes,
           actions = properties.actions,
-          description = tostring(properties.description)
+          description = tostring(properties.description),
+          condition = properties.condition.allOf
+'@
+
+# Data Collection Rule associations are child resources of the TARGET
+# (VM, etc.), not the DCR — used to detect DCRs with zero associations.
+$script:AzMonQDcrAssociations = @'
+resources
+| where type =~ 'microsoft.insights/datacollectionruleassociations'
+| project id, dcrId = tolower(tostring(properties.dataCollectionRuleId))
 '@
 
 $script:AzMonQActionGroups = @'

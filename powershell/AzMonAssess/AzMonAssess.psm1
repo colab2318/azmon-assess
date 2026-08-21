@@ -25,6 +25,7 @@ Export-ModuleMember -Function @(
     'Get-AzMonResource'
     'Get-AzMonDiagnosticSetting'
     'Get-AzMonDataCollectionRule'
+    'Get-AzMonDcrAssociatedId'
     'Get-AzMonVmAgentExtension'
     'Get-AzMonAdvisorRecommendation'
     'Find-AzMonConsolidationFinding'

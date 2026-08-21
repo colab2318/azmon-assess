@@ -54,6 +54,7 @@ function Invoke-AzMonAssessment {
 
     Write-Host '[azmon-assess] Collecting data collection rules (DCRs)...' -ForegroundColor DarkCyan
     $dataCollectionRules = Get-AzMonDataCollectionRule -SubscriptionId $subs
+    $dcrAssociatedIds = Get-AzMonDcrAssociatedId -SubscriptionId $subs
     Write-Host "[azmon-assess] Found $(@($dataCollectionRules).Count) DCR(s)." -ForegroundColor DarkCyan
 
     Write-Host '[azmon-assess] Collecting resources + diagnostic settings...' -ForegroundColor DarkCyan
@@ -98,7 +99,7 @@ function Invoke-AzMonAssessment {
     }
     if ($runAll -or $Only -contains 'coverage') {
         Write-Host '[azmon-assess] Analyzing coverage gaps...' -ForegroundColor DarkCyan
-        $findings.AddRange(@(Find-AzMonCoverageGapFinding -ResourceRef $resources -DiagnosticSetting $diagSettings -Workspace $workspaces -AppInsight $appInsights -HeartbeatResourceId $heartbeatResourceIds))
+        $findings.AddRange(@(Find-AzMonCoverageGapFinding -ResourceRef $resources -DiagnosticSetting $diagSettings -Workspace $workspaces -AppInsight $appInsights -HeartbeatResourceId $heartbeatResourceIds -DataCollectionRule $dataCollectionRules -DcrAssociatedId $dcrAssociatedIds))
     }
     if ($runAll -or $Only -contains 'alerting') {
         Write-Host '[azmon-assess] Analyzing alert quality...' -ForegroundColor DarkCyan
@@ -114,7 +115,7 @@ function Invoke-AzMonAssessment {
     }
     if ($runAll -or $Only -contains 'reliability') {
         Write-Host '[azmon-assess] Analyzing reliability posture (WAF)...' -ForegroundColor DarkCyan
-        $findings.AddRange(@(Find-AzMonReliabilityFinding -Workspace $workspaces -AppInsight $appInsights -AlertRule $alertRules -DiagnosticSetting $diagSettings -ResourceRef $resources))
+        $findings.AddRange(@(Find-AzMonReliabilityFinding -Workspace $workspaces -AppInsight $appInsights -AlertRule $alertRules -DiagnosticSetting $diagSettings -ResourceRef $resources -SubscriptionId $subs))
     }
     if ($runAll -or $Only -contains 'security') {
         Write-Host '[azmon-assess] Analyzing security posture (WAF)...' -ForegroundColor DarkCyan

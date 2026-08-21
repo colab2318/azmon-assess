@@ -70,6 +70,13 @@ function New-AzMonDemoSnapshot {
     $rules.Add((New-AzMonAlertRule -Id '/subscriptions/demo/rule-high-freq-log' -Name 'rule-high-freq-log' -SubscriptionId 'demo' `
             -ResourceGroup 'rg' -AlertKind 'log' -Enabled $true -Severity 3 `
             -Scopes @($workspaceArr[0]['Id']) -ActionGroupIds @('/subscriptions/demo/ag/ag-1') -EvaluationFrequencyMinutes 1))
+    # Good example: uses a dynamic threshold, so it's NOT flagged by the
+    # static-threshold-only finding (rule-0..19 above all default to static).
+    $rules.Add((New-AzMonAlertRule -Id '/subscriptions/demo/rule-dynamic-threshold' -Name 'rule-dynamic-threshold' -SubscriptionId 'demo' `
+            -ResourceGroup 'rg' -AlertKind 'metric' -Enabled $true -Severity 2 `
+            -Scopes @($workspaceArr[0]['Id']) -ActionGroupIds @('/subscriptions/demo/ag/ag-1') -HasDynamicThreshold $true))
+    # No Service Health activity-log alert is added for the 'demo'
+    # subscription, intentionally exercising the missing-coverage finding.
 
     $actionGroups = @(
         (New-AzMonActionGroup -Id '/subscriptions/demo/ag/ag-1' -Name 'ag-1' -SubscriptionId 'demo' -ResourceGroup 'rg' -UsedByRules 15)
@@ -126,7 +133,14 @@ function New-AzMonDemoSnapshot {
         (New-AzMonDataCollectionRule -Id '/subscriptions/demo/rg/rg/providers/Microsoft.Insights/dataCollectionRules/dcr-container-insights' `
                 -Name 'dcr-container-insights' -SubscriptionId 'demo' -ResourceGroup 'rg' -Location 'eastus' `
                 -DcrKind 'Linux' -DataFlowCount 1 -WorkspaceResourceId $workspaceArr[1]['Id'])
+        # Zero associations - exercises the orphaned-DCR finding.
+        (New-AzMonDataCollectionRule -Id '/subscriptions/demo/rg/rg/providers/Microsoft.Insights/dataCollectionRules/dcr-orphaned' `
+                -Name 'dcr-orphaned' -SubscriptionId 'demo' -ResourceGroup 'rg' -Location 'eastus' `
+                -DcrKind 'Linux' -DataFlowCount 1 -WorkspaceResourceId $workspaceArr[0]['Id'])
     )
+    $dcrAssociatedIds = [System.Collections.Generic.HashSet[string]]::new()
+    [void]$dcrAssociatedIds.Add(([string]$dcrs[0]['Id']).ToLowerInvariant())
+    [void]$dcrAssociatedIds.Add(([string]$dcrs[1]['Id']).ToLowerInvariant())
 
     $snapshot = New-AzMonSnapshotObject -SubscriptionId @('demo') -CustomerName $CustomerName `
         -Workspaces $workspaceArr -AppInsights $appInsights -AlertRules $rules.ToArray() `
@@ -134,11 +148,11 @@ function New-AzMonDemoSnapshot {
 
     $snapshot['Findings'] = @()
     $snapshot['Findings'] += Find-AzMonConsolidationFinding -Workspace $workspaceArr
-    $snapshot['Findings'] += Find-AzMonCoverageGapFinding -ResourceRef $resources.ToArray() -DiagnosticSetting @() -Workspace $workspaceArr -AppInsight $appInsights -HeartbeatResourceId $heartbeatResourceIds
+    $snapshot['Findings'] += Find-AzMonCoverageGapFinding -ResourceRef $resources.ToArray() -DiagnosticSetting @() -Workspace $workspaceArr -AppInsight $appInsights -HeartbeatResourceId $heartbeatResourceIds -DataCollectionRule $dcrs -DcrAssociatedId $dcrAssociatedIds
     $snapshot['Findings'] += Find-AzMonAlertQualityFinding -AlertRule $rules.ToArray() -ActionGroup $actionGroups -ResourceRef $resources.ToArray()
     $snapshot['Findings'] += Find-AzMonCostOptimizationFinding -Workspace $workspaceArr -AppInsight $appInsights -VmAgentExtension $vmAgentExtensions -AdvisorRecommendation $advisorRecommendations
     $snapshot['Findings'] += Find-AzMonTracingFinding -ResourceRef $resources.ToArray() -AppInsight $appInsights
-    $snapshot['Findings'] += Find-AzMonReliabilityFinding -Workspace $workspaceArr -AppInsight $appInsights -AlertRule $rules.ToArray() -DiagnosticSetting @() -ResourceRef $resources.ToArray()
+    $snapshot['Findings'] += Find-AzMonReliabilityFinding -Workspace $workspaceArr -AppInsight $appInsights -AlertRule $rules.ToArray() -DiagnosticSetting @() -ResourceRef $resources.ToArray() -SubscriptionId @('demo')
     $snapshot['Findings'] += Find-AzMonSecurityFinding -Workspace $workspaceArr -AppInsight $appInsights
     $snapshot['Findings'] += Find-AzMonPerformanceFinding -Workspace $workspaceArr -AppInsight $appInsights
 

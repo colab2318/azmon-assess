@@ -161,5 +161,23 @@ function Find-AzMonAlertQualityFinding {
             -Evidence @{ rules = @($highFreqLogAlerts | Select-Object -First 10 | ForEach-Object { @{ name = $_['Name']; frequency_minutes = $_['EvaluationFrequencyMinutes'] } }) }))
     }
 
+    # ---- Static-threshold-only metric alerts ----------------------------
+    # WAF Operational Excellence: "validate dynamic thresholds against real
+    # workload patterns" - a static threshold on a variable metric is a
+    # common source of alert noise or missed detections as load changes.
+    $staticOnlyMetricAlerts = @($AlertRule | Where-Object { $_['AlertKind'] -eq 'metric' -and $_['Enabled'] -and -not $_['HasDynamicThreshold'] })
+    if ($staticOnlyMetricAlerts.Count -gt 0) {
+        $findings.Add((New-AzMonFinding -Category 'alerting' -Severity 'low' `
+            -Title "$($staticOnlyMetricAlerts.Count) enabled metric alerts use only static thresholds" `
+            -Detail ('Static thresholds do not adapt to normal workload variation (time-of-day, day-of-week, ' +
+                'seasonal growth), which is a common cause of both alert fatigue and missed real degradations. ' +
+                'Dynamic thresholds learn a baseline per metric and adjust automatically.') `
+            -ResourceIds @($staticOnlyMetricAlerts | ForEach-Object { $_['Id'] }) `
+            -Recommendation ('Review the noisiest or least-trusted static-threshold rules first; switch their ' +
+                'criteria to Dynamic Threshold and validate the learned baseline against a few weeks of real ' +
+                'workload data before removing the static fallback.') `
+            -Evidence @{ names = @($staticOnlyMetricAlerts | Select-Object -First 50 | ForEach-Object { $_['Name'] }) }))
+    }
+
     return $findings.ToArray()
 }

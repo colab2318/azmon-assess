@@ -6,6 +6,11 @@ $script:AzMonBasicTierCandidates = @(
     'AppServiceConsoleLogs', 'AGWAccessLogs', 'APIMGatewayLogs', 'AKSAudit', 'AKSAuditAdmin'
 )
 
+# Auxiliary/Lake tier: even cheaper than Basic ("minimal" vs "reduced"
+# ingestion cost per Microsoft's table-plan comparison), purpose-built for
+# low-touch, compliance/audit-oriented raw event tables.
+$script:AzMonAuxiliaryTierCandidates = @('SecurityEvent', 'WindowsEvent', 'Syslog')
+
 function Find-AzMonCostOptimizationFinding {
     [CmdletBinding()]
     param(
@@ -37,6 +42,31 @@ function Find-AzMonCostOptimizationFinding {
             -Recommendation ('Convert candidate tables to Basic tier via az monitor log-analytics workspace table ' +
                 'update --plan Basic. Verify no alert rules depend on the table first.') `
             -Evidence @{ tables = @($candidates | ForEach-Object { , @($_.Table, $_.Gb) }); gb_30d_total = [Math]::Round($sumGb, 2) }))
+    }
+
+    foreach ($ws in $Workspace) {
+        $byTable = $ws['IngestionByTable']
+        if (-not $byTable -or $byTable.Count -eq 0) { continue }
+        $auxCandidates = [System.Collections.Generic.List[hashtable]]::new()
+        foreach ($table in $byTable.Keys) {
+            $gb = [double]$byTable[$table]
+            if (($script:AzMonAuxiliaryTierCandidates -contains $table) -and $gb -ge 5.0) {
+                $auxCandidates.Add(@{ Table = $table; Gb = [Math]::Round($gb, 2) })
+            }
+        }
+        if ($auxCandidates.Count -eq 0) { continue }
+        $auxSumGb = ($auxCandidates | Measure-Object -Property Gb -Sum).Sum
+        $auxSavings = [Math]::Round($auxSumGb * 2.3, 2)
+        $findings.Add((New-AzMonFinding -Category 'cost' -Severity $(if ($auxSavings -gt 200) { 'high' } else { 'medium' }) `
+            -Title "$($ws['Name']): $($auxCandidates.Count) audit/security tables good candidates for Auxiliary (Lake) tier" `
+            -Detail ('Auxiliary tier ingestion is even cheaper than Basic - built for low-touch, verbose audit ' +
+                'and compliance data like security/OS event logs that are rarely queried interactively and can ' +
+                'tolerate slower query performance.') `
+            -ResourceIds @($ws['Id']) -EstimatedMonthlySavingsUsd $auxSavings `
+            -Recommendation ('Convert candidate tables to the Auxiliary (Lake) plan. Confirm no alert rules or ' +
+                'dashboards need real-time query performance on these tables first, since Auxiliary does not ' +
+                'support alerts.') `
+            -Evidence @{ tables = @($auxCandidates | ForEach-Object { , @($_.Table, $_.Gb) }); gb_30d_total = [Math]::Round($auxSumGb, 2) }))
     }
 
     foreach ($ws in $Workspace) {

@@ -25,7 +25,8 @@ function Find-AzMonReliabilityFinding {
         [Parameter(Mandatory)] [AllowEmptyCollection()] [array] $AppInsight,
         [array] $AlertRule = @(),
         [array] $DiagnosticSetting = @(),
-        [array] $ResourceRef = @()
+        [array] $ResourceRef = @(),
+        [string[]] $SubscriptionId = @()
     )
     $findings = [System.Collections.Generic.List[hashtable]]::new()
     $azRegions = Get-AzMonAzRegionSet
@@ -112,6 +113,32 @@ function Find-AzMonReliabilityFinding {
                     'workspace, then migrate SDK connection strings during the next release.') `
                 -Evidence @{ location = $ai['Location']; workspace_location = $parent['Location'] }))
         }
+    }
+
+    # ---- Azure Service Health alert coverage ----------------------------
+    # Standard baseline: an activityLogAlert whose condition matches
+    # category=ServiceHealth, enabled, scoped to the subscription. Without
+    # one, Azure outage/maintenance notices are never proactively surfaced.
+    $serviceHealthCoveredSubs = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($rule in $AlertRule) {
+        if ($rule['AlertKind'] -ne 'activityLog' -or -not $rule['Enabled'] -or -not $rule['IsServiceHealthAlert']) { continue }
+        foreach ($scope in @($rule['Scopes'])) {
+            $s = ([string]$scope).ToLowerInvariant()
+            if ($s -match '^/subscriptions/([^/]+)\s*$') { [void]$serviceHealthCoveredSubs.Add($matches[1]) }
+        }
+    }
+    $uncoveredSubs = @($SubscriptionId | Where-Object { -not $serviceHealthCoveredSubs.Contains(([string]$_).ToLowerInvariant()) })
+    if ($uncoveredSubs.Count -gt 0) {
+        $findings.Add((New-AzMonFinding -Category 'reliability' -Severity 'medium' `
+            -Title "$($uncoveredSubs.Count) subscription(s) have no Azure Service Health alert configured" `
+            -Detail ('Without a Service Health alert, Azure service outages, planned maintenance, and health ' +
+                'advisories affecting your resources are only visible by checking the portal manually - they are ' +
+                'never proactively pushed to your team.') `
+            -ResourceIds @($uncoveredSubs | ForEach-Object { "/subscriptions/$_" }) `
+            -Recommendation ('Create an activity log alert scoped to the subscription with condition ' +
+                'category=ServiceHealth, covering Service issues, Planned maintenance, and Security advisories, ' +
+                'routed to the primary action group.') `
+            -Evidence @{ subscription_ids = $uncoveredSubs }))
     }
 
     return $findings.ToArray()

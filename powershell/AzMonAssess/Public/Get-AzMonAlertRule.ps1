@@ -30,6 +30,37 @@ function ConvertTo-AzMonActionGroupId {
     return $ids.ToArray()
 }
 
+function Test-AzMonServiceHealthCondition {
+    <#
+    .SYNOPSIS
+        True if an activity-log alert's condition.allOf includes a
+        category = ServiceHealth clause (the standard ARM shape for
+        Service Health alerts).
+    #>
+    [CmdletBinding()]
+    param($ConditionField)
+    foreach ($c in @(ConvertTo-AzMonHashtable $ConditionField)) {
+        if ($c -is [hashtable] -and ([string]$c['field']).ToLowerInvariant() -eq 'category' -and ([string]$c['equals']).ToLowerInvariant() -eq 'servicehealth') { return $true }
+    }
+    return $false
+}
+
+function Test-AzMonDynamicThresholdCriteria {
+    <#
+    .SYNOPSIS
+        True if a metric alert's criteria.allOf includes at least one
+        DynamicThresholdCriterion (as opposed to only static thresholds).
+    #>
+    [CmdletBinding()]
+    param($CriteriaField)
+    $criteria = ConvertTo-AzMonHashtable $CriteriaField
+    if ($criteria -isnot [hashtable] -or -not $criteria.ContainsKey('allOf')) { return $false }
+    foreach ($c in @($criteria['allOf'])) {
+        if ($c -is [hashtable] -and ([string]$c['criterionType']) -eq 'DynamicThresholdCriterion') { return $true }
+    }
+    return $false
+}
+
 function Get-AzMonAlertRule {
     <#
     .SYNOPSIS
@@ -50,9 +81,12 @@ function Get-AzMonAlertRule {
             $scopes = ConvertTo-AzMonHashtable $r.scopes
             if ($scopes -isnot [array]) { $scopes = if ($scopes) { @($scopes) } else { @() } }
             $evalFreq = if ($q.Kind -eq 'log') { ConvertFrom-AzMonIso8601Duration -Duration $r.evaluationFrequency } else { $null }
+            $isServiceHealth = if ($q.Kind -eq 'activityLog') { Test-AzMonServiceHealthCondition $r.condition } else { $false }
+            $hasDynamicThreshold = if ($q.Kind -eq 'metric') { Test-AzMonDynamicThresholdCriteria $r.criteria } else { $false }
             $rules.Add((New-AzMonAlertRule -Id $r.id -Name $r.name -SubscriptionId $r.subscriptionId -ResourceGroup $r.resourceGroup `
                 -AlertKind $q.Kind -Enabled ([bool]$r.enabled) -Severity $r.severity -Scopes $scopes `
-                -ActionGroupIds (ConvertTo-AzMonActionGroupId $r.actions) -Description $r.description -EvaluationFrequencyMinutes $evalFreq))
+                -ActionGroupIds (ConvertTo-AzMonActionGroupId $r.actions) -Description $r.description -EvaluationFrequencyMinutes $evalFreq `
+                -IsServiceHealthAlert $isServiceHealth -HasDynamicThreshold $hasDynamicThreshold))
         }
     }
     return $rules.ToArray()

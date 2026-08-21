@@ -22,7 +22,9 @@ function Find-AzMonCoverageGapFinding {
         [Parameter(Mandatory)] [AllowEmptyCollection()] [array] $DiagnosticSetting,
         [Parameter(Mandatory)] [AllowEmptyCollection()] [array] $Workspace,
         [Parameter(Mandatory)] [AllowEmptyCollection()] [array] $AppInsight,
-        [object] $HeartbeatResourceId = $null
+        [object] $HeartbeatResourceId = $null,
+        [array] $DataCollectionRule = @(),
+        [object] $DcrAssociatedId = $null
     )
     $findings = [System.Collections.Generic.List[hashtable]]::new()
 
@@ -144,6 +146,22 @@ function Find-AzMonCoverageGapFinding {
             -Recommendation ('Migrate to workspace-based Application Insights. See ' +
                 'https://learn.microsoft.com/azure/azure-monitor/app/convert-classic-resource') `
             -Evidence @{ components = @($classicAi | ForEach-Object { $_['Name'] }) }))
+    }
+
+    # ---- Orphaned Data Collection Rules ---------------------------------
+    # A DCR with zero resource associations does nothing - pure config
+    # clutter, and a common leftover from decommissioned VMs/AMA migrations.
+    if ($null -ne $DcrAssociatedId) {
+        $orphanedDcrs = @($DataCollectionRule | Where-Object { -not $DcrAssociatedId.Contains(([string]$_['Id']).ToLowerInvariant()) })
+        if ($orphanedDcrs.Count -gt 0) {
+            $findings.Add((New-AzMonFinding -Category 'coverage' -Severity 'low' `
+                -Title "$($orphanedDcrs.Count) Data Collection Rules have zero resource associations" `
+                -Detail ('These DCRs are not attached to any VM, AMA extension, or other data source, so they ' +
+                    'collect nothing. Common leftovers from decommissioned VMs or AMA migration cleanups.') `
+                -ResourceIds @($orphanedDcrs | ForEach-Object { $_['Id'] }) `
+                -Recommendation 'Delete orphaned DCRs, or associate them with their intended resources if still needed.' `
+                -Evidence @{ names = @($orphanedDcrs | ForEach-Object { $_['Name'] }) }))
+        }
     }
 
     return $findings.ToArray()

@@ -18,3 +18,19 @@ function Get-AzMonDataCollectionRule {
         }
     )
 }
+
+function Get-AzMonDcrAssociatedId {
+    <#
+    .SYNOPSIS
+        Returns a HashSet of (lowercased) DCR resource IDs that have at
+        least one association — used to detect orphaned DCRs. Associations
+        are child resources of the TARGET (VM, etc.), not the DCR itself.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string[]] $SubscriptionId)
+
+    $rows = Invoke-AzMonGraphQuery -Query $script:AzMonQDcrAssociations -SubscriptionId $SubscriptionId
+    $ids = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($r in $rows) { if ($r.dcrId) { [void]$ids.Add([string]$r.dcrId) } }
+    return $ids
+}

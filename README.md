@@ -24,14 +24,14 @@ cd powershell
 |---|---|
 | Inventory of Log Analytics workspaces, App Insights, alerts, action groups, DCRs | Workspace / component sprawl |
 | Per-workspace ingestion & cost analysis (billable GB by table, retention, commitment tier fit) | Unpredictable monitoring bills |
-| Coverage-gap detection (resources without diagnostics, VMs without heartbeat, web apps without App Insights) | Missed critical incidents |
-| Alert quality scoring (noisy rules, missing critical rules, orphaned action groups, broad-scope metric alerts, high-frequency log search alerts) | Alert noise + under-alerting + alert evaluation cost |
+| Coverage-gap detection (resources without diagnostics, VMs without heartbeat, web apps without App Insights, orphaned Data Collection Rules) | Missed critical incidents |
+| Alert quality scoring (noisy rules, missing critical rules, orphaned action groups, broad-scope metric alerts, high-frequency log search alerts, static-threshold-only metric alerts) | Alert noise + under-alerting + alert evaluation cost |
 | Consolidation planner (groups workspaces by region/env, projects commitment-tier savings) | Central monitoring strategy |
 | Distributed-tracing readiness check (OpenTelemetry / App Insights auto-instrumentation coverage) | End-to-end tracing gap |
-| **Reliability (WAF)** — workspace AZ-region check, prod dual-destination logs, workspace health alert coverage | Zonal outages, silent ingestion failures |
+| **Reliability (WAF)** — workspace AZ-region check, prod dual-destination logs, workspace health alert coverage, Azure Service Health alert coverage | Zonal outages, silent ingestion failures, unnoticed Azure service incidents |
 | **Security (WAF)** — public network access, Entra-only (disable local auth), classic AI detection, workspace/AI coherence | Data exfiltration, key sprawl, missing Private Link |
 | **Performance Efficiency (WAF)** — AI/workspace region colocation, Search Jobs / Basic-tier candidates, dedicated cluster fit | Cross-region latency, hot-storage cost, throttled queries |
-| **Cost Optimization (WAF, extended)** — App Insights daily cap, Sentinel commingled with ops data, Summary Rules candidates, standalone-workspace commitment tiers, retired Log Analytics agent (MMA) detection, live Azure Advisor cost recommendations | Runaway telemetry cost, Sentinel surcharge waste, silent monitoring blind spots from the retired agent |
+| **Cost Optimization (WAF, extended)** — App Insights daily cap, Sentinel commingled with ops data, Summary Rules candidates, standalone-workspace commitment tiers, retired Log Analytics agent (MMA) detection, live Azure Advisor cost recommendations, Auxiliary (Lake) tier candidates | Runaway telemetry cost, Sentinel surcharge waste, silent monitoring blind spots from the retired agent |
 | AI-generated executive summary + prioritized recommendations (Azure OpenAI) | Leadership-ready briefing |
 | **Multi-format reports** — HTML, Markdown, **Excel workbook** (incl. resource-centric Impacted Resources Analysis sheet), **PowerPoint deck** | Analyst + executive audience |
 | **Interactive / batch triage** — decisions per finding, resumable sessions | Structured follow-through |
