@@ -39,27 +39,27 @@ function Invoke-AzMonAssessment {
     Write-Host "[azmon-assess] Assessing $(@($subs).Count) subscription(s)..." -ForegroundColor Cyan
 
     Write-Host '[azmon-assess] Collecting Log Analytics workspaces...' -ForegroundColor DarkCyan
-    $workspaces = Get-AzMonWorkspace -SubscriptionId $subs -SkipIngestionEnrichment:$SkipIngestionEnrichment -LookbackDays $LookbackDays -ThrottleLimit $ThrottleLimit
+    $workspaces = @(Get-AzMonWorkspace -SubscriptionId $subs -SkipIngestionEnrichment:$SkipIngestionEnrichment -LookbackDays $LookbackDays -ThrottleLimit $ThrottleLimit | Where-Object { $null -ne $_ })
     Write-Host "[azmon-assess] Found $(@($workspaces).Count) workspace(s)." -ForegroundColor DarkCyan
 
     Write-Host '[azmon-assess] Collecting Application Insights...' -ForegroundColor DarkCyan
-    $appInsights = Get-AzMonAppInsight -SubscriptionId $subs
+    $appInsights = @(Get-AzMonAppInsight -SubscriptionId $subs | Where-Object { $null -ne $_ })
     Write-Host "[azmon-assess] Found $(@($appInsights).Count) App Insights component(s)." -ForegroundColor DarkCyan
 
     Write-Host '[azmon-assess] Collecting alert rules + action groups...' -ForegroundColor DarkCyan
-    $alertRules = Get-AzMonAlertRule -SubscriptionId $subs
-    $alertRules = Add-AzMonAlertFireRate -SubscriptionId $subs -AlertRule $alertRules
-    $actionGroups = Get-AzMonActionGroup -SubscriptionId $subs -AlertRule $alertRules
+    $alertRules = @(Get-AzMonAlertRule -SubscriptionId $subs | Where-Object { $null -ne $_ })
+    $alertRules = @(Add-AzMonAlertFireRate -SubscriptionId $subs -AlertRule $alertRules | Where-Object { $null -ne $_ })
+    $actionGroups = @(Get-AzMonActionGroup -SubscriptionId $subs -AlertRule $alertRules | Where-Object { $null -ne $_ })
     Write-Host "[azmon-assess] Found $(@($alertRules).Count) alert rule(s), $(@($actionGroups).Count) action group(s)." -ForegroundColor DarkCyan
 
     Write-Host '[azmon-assess] Collecting data collection rules (DCRs)...' -ForegroundColor DarkCyan
-    $dataCollectionRules = Get-AzMonDataCollectionRule -SubscriptionId $subs
+    $dataCollectionRules = @(Get-AzMonDataCollectionRule -SubscriptionId $subs | Where-Object { $null -ne $_ })
     $dcrAssociatedIds = Get-AzMonDcrAssociatedId -SubscriptionId $subs
     Write-Host "[azmon-assess] Found $(@($dataCollectionRules).Count) DCR(s)." -ForegroundColor DarkCyan
 
     Write-Host '[azmon-assess] Collecting resources + diagnostic settings...' -ForegroundColor DarkCyan
-    $resources = Get-AzMonResource -SubscriptionId $subs
-    $diagSettings = Get-AzMonDiagnosticSetting -SubscriptionId $subs
+    $resources = @(Get-AzMonResource -SubscriptionId $subs | Where-Object { $null -ne $_ })
+    $diagSettings = @(Get-AzMonDiagnosticSetting -SubscriptionId $subs | Where-Object { $null -ne $_ })
     Write-Host "[azmon-assess] Found $(@($resources).Count) monitorable resource(s), $(@($diagSettings).Count) diagnostic setting(s)." -ForegroundColor DarkCyan
 
     Write-Host '[azmon-assess] Collecting VM heartbeat coverage...' -ForegroundColor DarkCyan
@@ -67,11 +67,11 @@ function Invoke-AzMonAssessment {
     Write-Host "[azmon-assess] Found heartbeat for $($heartbeatResourceIds.Count) resource(s)." -ForegroundColor DarkCyan
 
     Write-Host '[azmon-assess] Collecting VM monitoring agent extensions...' -ForegroundColor DarkCyan
-    $vmAgentExtensions = Get-AzMonVmAgentExtension -SubscriptionId $subs
+    $vmAgentExtensions = @(Get-AzMonVmAgentExtension -SubscriptionId $subs | Where-Object { $null -ne $_ })
     Write-Host "[azmon-assess] Found $(@($vmAgentExtensions).Count) monitoring-agent extension(s)." -ForegroundColor DarkCyan
 
     Write-Host '[azmon-assess] Collecting Azure Advisor cost recommendations...' -ForegroundColor DarkCyan
-    $advisorRecommendations = Get-AzMonAdvisorRecommendation -SubscriptionId $subs
+    $advisorRecommendations = @(Get-AzMonAdvisorRecommendation -SubscriptionId $subs | Where-Object { $null -ne $_ })
     Write-Host "[azmon-assess] Found $(@($advisorRecommendations).Count) Advisor cost recommendation(s)." -ForegroundColor DarkCyan
 
     $snapshot = New-AzMonSnapshotObject -SubscriptionId $subs -CustomerName $CustomerName `
