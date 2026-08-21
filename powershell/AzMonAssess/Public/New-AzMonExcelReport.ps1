@@ -135,22 +135,24 @@ function Add-AzMonExcelFindingsSheet {
 
     $findings = Sort-AzMonFinding -Finding @($Snapshot['Findings'])
     $ws = Add-AzMonXlsxSheet -Workbook $Workbook -Name 'Findings'
-    Add-AzMonXlsxHeaderRow -Sheet $ws -Header @('Severity', 'Category', 'Title', 'Detail', 'Recommendation', 'Est. $/mo Savings', 'Affected Resources', 'Finding ID') | Out-Null
+    Add-AzMonXlsxHeaderRow -Sheet $ws -Header @('Severity', 'Category', 'Title', 'Detail', 'Recommendation', 'Est. $/mo Savings', 'Affected Resources', 'Finding ID', 'Learn More Link') | Out-Null
 
     if ($findings.Count -eq 0) {
-        Add-AzMonXlsxRow -Sheet $ws -Cell @('', '', 'No findings', '', '', 0.0, 0.0, '') | Out-Null
+        Add-AzMonXlsxRow -Sheet $ws -Cell @('', '', 'No findings', '', '', 0.0, 0.0, '', '') | Out-Null
     }
     foreach ($f in $findings) {
         $cells = @(
             ([string]$f['Severity']).ToUpperInvariant(), (Get-AzMonCategoryLabel $f['Category']), $f['Title'], $f['Detail'],
-            ($f['Recommendation'] ?? ''), [double]($f['EstimatedMonthlySavingsUsd'] ?? 0), [double]@($f['ResourceIds']).Count, $f['Id']
+            ($f['Recommendation'] ?? ''), [double]($f['EstimatedMonthlySavingsUsd'] ?? 0), [double]@($f['ResourceIds']).Count, $f['Id'],
+            ($f['LearnMoreLink'] ?? '')
         )
         $rowNum = Add-AzMonXlsxRow -Sheet $ws -Cell $cells
-        Set-AzMonXlsxRowFill -Sheet $ws -Row $rowNum -ColumnCount 8 -Hex $script:AzMonSevFillHex[$f['Severity'] ?? '']
+        Set-AzMonXlsxRowFill -Sheet $ws -Row $rowNum -ColumnCount 9 -Hex $script:AzMonSevFillHex[$f['Severity'] ?? '']
         Set-AzMonXlsxCellWrap -Sheet $ws -Row $rowNum -Column 4
         Set-AzMonXlsxCellWrap -Sheet $ws -Row $rowNum -Column 5
+        if ($f['LearnMoreLink']) { Set-AzMonXlsxHyperlink -Sheet $ws -Row $rowNum -Column 9 -Url $f['LearnMoreLink'] -Text 'Learn more' }
     }
-    Set-AzMonXlsxColumnWidths -Sheet $ws -Width @(10, 16, 55, 70, 70, 15, 12, 38)
+    Set-AzMonXlsxColumnWidths -Sheet $ws -Width @(10, 16, 55, 70, 70, 15, 12, 38, 45)
     Set-AzMonXlsxFreezeHeader -Sheet $ws
     Set-AzMonXlsxAutoFilter -Sheet $ws
 }
@@ -161,9 +163,11 @@ function Add-AzMonExcelImpactedResourcesSheet {
         Resource-centric findings view: one row per (finding, resource)
         pair. Column layout mirrors the "4.ImpactedResourcesAnalysis" sheet
         of the reference WARA-style expert-analysis workbook, adapted to
-        azmon-assess's own data model. Columns azmon-assess has no source
-        for (custom1-5, Learn More Link, Platform Issue / Retirement /
-        Support Request tracking IDs) are left blank rather than guessed.
+        azmon-assess's own data model. Learn More Link is populated with a
+        verified official Microsoft Learn URL per finding. Columns
+        azmon-assess has no source for (custom1-5, Platform Issue /
+        Retirement / Support Request tracking IDs) are left blank rather
+        than guessed.
     #>
     param([hashtable] $Workbook, [hashtable] $Snapshot, [hashtable] $Lookup)
 
@@ -191,7 +195,7 @@ function Add-AzMonExcelImpactedResourcesSheet {
             $cells = @(
                 'Not Reviewed', 'Resource', $desc.Type, $desc.SubscriptionId, $desc.ResourceGroup, $desc.Location, $desc.Name, $rid,
                 '', '', '', '', '',
-                $f['Title'], $impact, (Get-AzMonCategoryLabel $f['Category']), $benefit, '',
+                $f['Title'], $impact, (Get-AzMonCategoryLabel $f['Category']), $benefit, ($f['LearnMoreLink'] ?? ''),
                 $f['Detail'], 'Azure Monitor', 'azmon-assess', (Get-AzMonWafPillar $f['Category']), '', '', '', '', $f['Id']
             )
             $rowNum = Add-AzMonXlsxRow -Sheet $ws -Cell $cells
@@ -200,6 +204,7 @@ function Add-AzMonExcelImpactedResourcesSheet {
             Set-AzMonXlsxCellWrap -Sheet $ws -Row $rowNum -Column 19
             $impactFill = $script:AzMonSevFillHex[$f['Severity'] ?? '']
             if ($impactFill) { $ws.Rows[$rowNum - 1].Cells[14].FillHex = $impactFill }
+            if ($f['LearnMoreLink']) { Set-AzMonXlsxHyperlink -Sheet $ws -Row $rowNum -Column 18 -Url $f['LearnMoreLink'] -Text 'Learn more' }
         }
     }
     Set-AzMonXlsxColumnWidths -Sheet $ws -Width @(18, 14, 26, 36, 20, 14, 26, 60, 10, 10, 10, 10, 10, 40, 10, 20, 30, 24, 60, 14, 12, 20, 16, 16, 16, 20, 36)

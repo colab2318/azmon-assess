@@ -242,7 +242,8 @@ function New-AzMonFinding {
         [string[]] $ResourceIds = @(),
         [Nullable[double]] $EstimatedMonthlySavingsUsd,
         [string] $Recommendation,
-        [hashtable] $Evidence = @{}
+        [hashtable] $Evidence = @{},
+        [string] $LearnMoreLink
     )
     @{
         Kind                       = 'Finding'
@@ -255,6 +256,7 @@ function New-AzMonFinding {
         EstimatedMonthlySavingsUsd = $EstimatedMonthlySavingsUsd
         Recommendation             = $Recommendation
         Evidence                   = $Evidence
+        LearnMoreLink              = $LearnMoreLink
     }
 }
 

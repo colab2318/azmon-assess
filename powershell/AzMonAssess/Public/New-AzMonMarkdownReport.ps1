@@ -51,6 +51,10 @@ function New-AzMonMarkdownReport {
             [void]$lines.Add("**Recommendation:** $($f['Recommendation'])")
             [void]$lines.Add('')
         }
+        if ($f['LearnMoreLink']) {
+            [void]$lines.Add("**Learn more:** [$($f['LearnMoreLink'])]($($f['LearnMoreLink']))")
+            [void]$lines.Add('')
+        }
         if (@($f['ResourceIds']).Count -gt 0) {
             [void]$lines.Add("_Affects $(@($f['ResourceIds']).Count) resource(s)._")
             [void]$lines.Add('')

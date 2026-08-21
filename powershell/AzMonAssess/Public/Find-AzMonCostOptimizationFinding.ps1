@@ -41,6 +41,7 @@ function Find-AzMonCostOptimizationFinding {
             -ResourceIds @($ws['Id']) -EstimatedMonthlySavingsUsd $savings `
             -Recommendation ('Convert candidate tables to Basic tier via az monitor log-analytics workspace table ' +
                 'update --plan Basic. Verify no alert rules depend on the table first.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-table-plans' `
             -Evidence @{ tables = @($candidates | ForEach-Object { , @($_.Table, $_.Gb) }); gb_30d_total = [Math]::Round($sumGb, 2) }))
     }
 
@@ -66,6 +67,7 @@ function Find-AzMonCostOptimizationFinding {
             -Recommendation ('Convert candidate tables to the Auxiliary (Lake) plan. Confirm no alert rules or ' +
                 'dashboards need real-time query performance on these tables first, since Auxiliary does not ' +
                 'support alerts.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/data-platform-logs#table-plans' `
             -Evidence @{ tables = @($auxCandidates | ForEach-Object { , @($_.Table, $_.Gb) }); gb_30d_total = [Math]::Round($auxSumGb, 2) }))
     }
 
@@ -79,6 +81,7 @@ function Find-AzMonCostOptimizationFinding {
                 -ResourceIds @($ws['Id']) `
                 -Recommendation ('Set dailyQuotaGb to ~120% of the P95 daily ingestion. Log an alert when the cap ' +
                     'is hit so the team is notified before data is dropped.') `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/daily-cap' `
                 -Evidence @{ ingestion_gb_30d = $gb30 }))
         }
     }
@@ -92,7 +95,8 @@ function Find-AzMonCostOptimizationFinding {
                     'visibility.') `
                 -ResourceIds @($ai['Id']) `
                 -Recommendation ('Enable adaptive sampling in the SDK (default 5 items/sec target) or set an ' +
-                    'ingestion sampling percentage on the AI resource.')))
+                    'ingestion sampling percentage on the AI resource.') `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/app/sampling'))
         }
     }
 
@@ -105,7 +109,8 @@ function Find-AzMonCostOptimizationFinding {
                     'cost overnight before anyone notices. WAF recommends a cap sized ~120% of the P95 daily volume.') `
                 -ResourceIds @($ai['Id']) `
                 -Recommendation ('Set the daily volume cap via az monitor app-insights component update ' +
-                    '--daily-cap <gb> and enable the "90% of cap reached" alert.')))
+                    '--daily-cap <gb> and enable the "90% of cap reached" alert.') `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/daily-cap'))
         }
     }
 
@@ -129,6 +134,7 @@ function Find-AzMonCostOptimizationFinding {
             -ResourceIds @($ws['Id']) -EstimatedMonthlySavingsUsd $savings `
             -Recommendation ('Create a dedicated ops workspace in the same region, redirect diagnostic settings ' +
                 'and DCRs for operational sources, then keep Sentinel scoped to security telemetry only.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/cost-logs#workspaces-with-microsoft-sentinel' `
             -Evidence @{
                 ops_tables              = @($overlappingOps | Sort-Object)
                 ops_gb_30d              = $opsGb
@@ -157,6 +163,7 @@ function Find-AzMonCostOptimizationFinding {
             -Recommendation ('Author Summary Rules for the noisiest tables (e.g., 5-min aggregates of ' +
                 'AppServiceHTTPLogs per status/route). Retain rollups in Analytics tier and raw data in Basic + ' +
                 'storage archive.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/summary-rules' `
             -Evidence @{ tables = @($summaryCandidates | ForEach-Object { , @($_.Table, $_.Gb) }) }))
     }
 
@@ -185,6 +192,7 @@ function Find-AzMonCostOptimizationFinding {
                 'remaining agents, generate data collection rules with the DCR Config Generator, deploy AMA via ' +
                 'Azure Policy, validate ingestion, then remove the legacy agent with the MMA Discovery and Removal ' +
                 'tool. See https://learn.microsoft.com/azure/azure-monitor/agents/azure-monitor-agent-migration') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-migration' `
             -Evidence @{ vm_count = $legacyOnlyVmIds.Count }))
     }
 
@@ -216,6 +224,7 @@ function Find-AzMonCostOptimizationFinding {
                 'workspace update --sku CapacityReservation --capacity-reservation-level <tier>. Use the Azure ' +
                 'Pricing Calculator to pick the closest tier at or below current daily GB, then re-check after ' +
                 '30 days of billing to confirm the fit.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/cost-logs#commitment-tiers' `
             -Evidence @{ daily_gb = [Math]::Round($dailyGb, 2); price_per_gb = $best.PricePerGb }))
     }
 
@@ -232,6 +241,7 @@ function Find-AzMonCostOptimizationFinding {
             -Detail "$($rec['Solution'])$benefitSuffix" `
             -ResourceIds @($rec['ResourceId']) `
             -Recommendation $recommendation `
+            -LearnMoreLink $rec['LearnMoreLink'] `
             -Evidence @{ source = 'Azure Advisor'; impacted_field = $rec['ImpactedField'] }))
     }
 

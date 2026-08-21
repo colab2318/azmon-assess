@@ -31,6 +31,7 @@ function Find-AzMonAlertQualityFinding {
                 'Disabled rules are a frequent cause of missing critical alerts.') `
             -ResourceIds @($disabled | ForEach-Object { $_['Id'] }) `
             -Recommendation 'Review each disabled rule; either delete or re-enable with tuned thresholds.' `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-overview' `
             -Evidence @{ names = @($disabled | Select-Object -First 50 | ForEach-Object { $_['Name'] }) }))
     }
 
@@ -42,6 +43,7 @@ function Find-AzMonAlertQualityFinding {
             -ResourceIds @($silent | ForEach-Object { $_['Id'] }) `
             -Recommendation ('Attach a standard action group (see bicep/action-group.bicep). For business-critical ' +
                 'rules, route to the paging channel; for hygiene rules, route to a low-priority email or Teams webhook.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/action-groups' `
             -Evidence @{ names = @($silent | Select-Object -First 50 | ForEach-Object { $_['Name'] }) }))
     }
 
@@ -52,6 +54,7 @@ function Find-AzMonAlertQualityFinding {
             -Detail 'Unused action groups add clutter and confuse on-call rotation.' `
             -ResourceIds @($orphans | ForEach-Object { $_['Id'] }) `
             -Recommendation 'Delete or repurpose these action groups.' `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/action-groups' `
             -Evidence @{ names = @($orphans | ForEach-Object { $_['Name'] }) }))
     }
 
@@ -61,7 +64,8 @@ function Find-AzMonAlertQualityFinding {
             -Title "$($unsevered.Count) rules do not set an explicit severity" `
             -Detail 'Without severity, correlation and routing become inconsistent.' `
             -ResourceIds @($unsevered | Select-Object -First 100 | ForEach-Object { $_['Id'] }) `
-            -Recommendation 'Set severity 0-4 explicitly on all rules; standardize per runbook.'))
+            -Recommendation 'Set severity 0-4 explicitly on all rules; standardize per runbook.' `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-overview'))
     }
 
     # ---- Noisy rules: high fire-rate over the last 30 days -------------
@@ -78,6 +82,7 @@ function Find-AzMonAlertQualityFinding {
             -ResourceIds @($noisy | Select-Object -First 50 | ForEach-Object { $_['Id'] }) `
             -Recommendation ('Review the noisiest rules first: raise the threshold, add an aggregation window, ' +
                 'suppress during known maintenance, or replace with a smarter dynamic-threshold condition.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-dynamic-thresholds' `
             -Evidence @{ top_noisy_rules = @($noisy | Select-Object -First 10 | ForEach-Object { @{ name = $_['Name']; fire_count_30d = $_['FireCount30d'] } }) }))
     }
 
@@ -118,6 +123,7 @@ function Find-AzMonAlertQualityFinding {
             -Recommendation ('Deploy the included Bicep alert-baseline (bicep/alert-baseline.bicep) which creates ' +
                 'recommended metric alerts per resource type. Use Azure Policy deployIfNotExists to auto-provision ' +
                 'alerts on new resources.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-overview#recommended-alert-rules' `
             -Evidence @{ uncovered = @($uncovered | ForEach-Object { @{ type = $_.Type; count = $_.Count; expected_alerts = $script:AzMonExpectedAlertsByType[$_.Type] } }) }))
     }
 
@@ -137,6 +143,7 @@ function Find-AzMonAlertQualityFinding {
             -Recommendation ('Review the widest-scoped rules first: split by criticality tier, reduce the scope ' +
                 'to only resources that need this exact threshold, or replace with a log search alert over the ' +
                 'same resource set.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-overview' `
             -Evidence @{ top_broad_rules = @($broadScope | Select-Object -First 10 | ForEach-Object { @{ name = $_['Name']; scope_count = @($_['Scopes']).Count } }) }))
     }
 
@@ -158,6 +165,7 @@ function Find-AzMonAlertQualityFinding {
             -Recommendation ('For each rule, confirm whether the monitored condition truly needs evaluation this ' +
                 'often; increase evaluationFrequency (e.g., to 15 or 30 minutes) where a slower detection time is ' +
                 'acceptable.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/cost-logs' `
             -Evidence @{ rules = @($highFreqLogAlerts | Select-Object -First 10 | ForEach-Object { @{ name = $_['Name']; frequency_minutes = $_['EvaluationFrequencyMinutes'] } }) }))
     }
 
@@ -176,6 +184,7 @@ function Find-AzMonAlertQualityFinding {
             -Recommendation ('Review the noisiest or least-trusted static-threshold rules first; switch their ' +
                 'criteria to Dynamic Threshold and validate the learned baseline against a few weeks of real ' +
                 'workload data before removing the static fallback.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-dynamic-thresholds' `
             -Evidence @{ names = @($staticOnlyMetricAlerts | Select-Object -First 50 | ForEach-Object { $_['Name'] }) }))
     }
 

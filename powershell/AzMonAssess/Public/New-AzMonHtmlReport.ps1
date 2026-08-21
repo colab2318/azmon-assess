@@ -59,6 +59,9 @@ $script:AzMonHtmlCss = @'
   .finding h3 { margin: 8px 0; font-size: 16px; }
   .finding .detail { color: var(--muted); font-size: 14px; line-height: 1.6; }
   .finding .rec { margin-top: 12px; padding: 10px 14px; background: rgba(56, 189, 248, 0.08); border-left: 3px solid var(--accent); font-size: 14px; }
+  .finding .learn-more { margin-top: 8px; font-size: 13px; }
+  .finding .learn-more a { color: var(--accent); text-decoration: none; }
+  .finding .learn-more a:hover { text-decoration: underline; }
   details { margin-top: 10px; }
   summary { cursor: pointer; color: var(--accent); font-size: 13px; }
   pre.evidence { background: #0b1220; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; }
@@ -148,6 +151,10 @@ function New-AzMonHtmlReport {
         [void]$sb.AppendLine("      <div class=""detail"">$(ConvertTo-AzMonHtmlText ([string]$f['Detail']))</div>")
         if ($f['Recommendation']) {
             [void]$sb.AppendLine("      <div class=""rec""><strong>Recommendation:</strong> $(ConvertTo-AzMonHtmlText ([string]$f['Recommendation']))</div>")
+        }
+        if ($f['LearnMoreLink']) {
+            $learnUrl = ConvertTo-AzMonHtmlText ([string]$f['LearnMoreLink'])
+            [void]$sb.AppendLine("      <div class=""learn-more""><a href=""$learnUrl"" target=""_blank"" rel=""noopener noreferrer"">Learn more (Microsoft Learn)</a></div>")
         }
 
         $resourceIds = @($f['ResourceIds'])

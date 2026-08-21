@@ -24,6 +24,7 @@ function Find-AzMonSecurityFinding {
                     -Recommendation ("Set publicNetworkAccessFor$dirTitle to 'Disabled' and attach the workspace " +
                         'to an Azure Monitor Private Link Scope. Update agents and app-side connection strings ' +
                         'before cutover to avoid ingestion outage.') `
+                    -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/private-link-security' `
                     -Evidence @{ direction = $pair.Direction; value = $pair.Value }))
             }
         }
@@ -39,7 +40,8 @@ function Find-AzMonSecurityFinding {
                 -ResourceIds @($ws['Id']) `
                 -Recommendation ('Roll out DCR-based agents with managed identity, then set ' +
                     'features.disableLocalAuth = true on the workspace. Retire legacy Log Analytics Agent (MMA) ' +
-                    'as part of the change.')))
+                    'as part of the change.') `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/overview#microsoft-entra-authentication-for-workspace-data'))
         }
     }
 
@@ -56,7 +58,8 @@ function Find-AzMonSecurityFinding {
                     -ResourceIds @($ai['Id']) `
                     -Recommendation ("Attach the App Insights resource to an AMPLS and set " +
                         "publicNetworkAccessFor$dirTitle to 'Disabled'. Ensure app hosts have a private endpoint " +
-                        'route to the AMPLS.')))
+                        'route to the AMPLS.') `
+                    -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/private-link-security'))
             }
         }
     }
@@ -70,7 +73,8 @@ function Find-AzMonSecurityFinding {
                 -ResourceIds @($ai['Id']) `
                 -Recommendation ('Set DisableLocalAuth = true on the AI resource, roll app-side to the Azure ' +
                     'Monitor OpenTelemetry Distro with managed identity, then remove any embedded instrumentation ' +
-                    'keys from config/secrets.')))
+                    'keys from config/secrets.') `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/app/azure-ad-authentication'))
         }
     }
 
@@ -83,7 +87,8 @@ function Find-AzMonSecurityFinding {
                     'controls like Private Link and CMK.') `
                 -ResourceIds @($ai['Id']) `
                 -Recommendation ('Migrate to workspace-based Application Insights (in-place, no data loss). Use ' +
-                    'az monitor app-insights component update --workspace ...')))
+                    'az monitor app-insights component update --workspace ...') `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/app/convert-classic-resource'))
         }
     }
 
@@ -104,6 +109,7 @@ function Find-AzMonSecurityFinding {
                 -ResourceIds @($ai['Id'], $ws['Id']) `
                 -Recommendation ('Align publicNetworkAccessForIngestion on both resources; if using an AMPLS, add ' +
                     'both to the same private link scope.') `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/private-link-security' `
                 -Evidence @{ ai = $aiPub; workspace = $wsPub }))
         }
     }

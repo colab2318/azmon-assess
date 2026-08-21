@@ -96,6 +96,7 @@ function Get-AzMonRuleBasedSummary {
         $savingsText = if ($f['EstimatedMonthlySavingsUsd']) { " — est. $(Format-AzMonUsd $f['EstimatedMonthlySavingsUsd'])/mo" } else { '' }
         [void]$lines.Add("$i. **[$(([string]$f['Severity']).ToUpperInvariant())]** $($f['Title'])$savingsText")
         if ($f['Recommendation']) { [void]$lines.Add("   - $($f['Recommendation'])") }
+        if ($f['LearnMoreLink']) { [void]$lines.Add("   - Learn more: $($f['LearnMoreLink'])") }
         $i++
     }
     [void]$lines.Add('')

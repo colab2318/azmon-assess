@@ -95,6 +95,7 @@ function Find-AzMonCoverageGapFinding {
             -ResourceIds @($missingDiag | ForEach-Object { $_['Id'] }) `
             -Recommendation ('Deploy the included Bicep policy (bicep/diag-settings-baseline.bicep) or an Azure ' +
                 'Policy assignment deployIfNotExists to auto-enable diagnostic settings on new resources.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/diagnostic-settings' `
             -Evidence @{ by_type = Get-AzMonCountByType -ResourceRef $missingDiag.ToArray() }))
     }
 
@@ -107,6 +108,7 @@ function Find-AzMonCoverageGapFinding {
                 'Add (or enable Logs on) a workspace destination.') `
             -ResourceIds @($notToWs | ForEach-Object { $_['Id'] }) `
             -Recommendation 'Add a workspace destination with Logs categories enabled to each diagnostic setting.' `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/diagnostic-settings' `
             -Evidence @{ by_type = Get-AzMonCountByType -ResourceRef $notToWs.ToArray() }))
     }
 
@@ -121,6 +123,7 @@ function Find-AzMonCoverageGapFinding {
                 'turn on the platform auto-instrumentation (App Service -> Application Insights blade -> Enable). ' +
                 'For containerized apps, deploy the OTel collector sidecar and point it at the workspace-based ' +
                 'AI resource.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/app/opentelemetry-enable' `
             -Evidence @{ by_type = Get-AzMonCountByType -ResourceRef $webWithoutAi.ToArray() }))
     }
 
@@ -133,7 +136,8 @@ function Find-AzMonCoverageGapFinding {
             -ResourceIds @($vmNoHeartbeat | ForEach-Object { $_['Id'] }) `
             -Recommendation ('Install/repair the Azure Monitor Agent via a DCR association ' +
                 '(Microsoft.Insights/dataCollectionRuleAssociations) pointed at a workspace, or investigate agent ' +
-                'health if it was previously connected.')))
+                'health if it was previously connected.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-overview'))
     }
 
     $classicAi = @($AppInsight | Where-Object { -not $_['WorkspaceResourceId'] })
@@ -145,6 +149,7 @@ function Find-AzMonCoverageGapFinding {
             -ResourceIds @($classicAi | ForEach-Object { $_['Id'] }) `
             -Recommendation ('Migrate to workspace-based Application Insights. See ' +
                 'https://learn.microsoft.com/azure/azure-monitor/app/convert-classic-resource') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/app/convert-classic-resource' `
             -Evidence @{ components = @($classicAi | ForEach-Object { $_['Name'] }) }))
     }
 
@@ -160,6 +165,7 @@ function Find-AzMonCoverageGapFinding {
                     'collect nothing. Common leftovers from decommissioned VMs or AMA migration cleanups.') `
                 -ResourceIds @($orphanedDcrs | ForEach-Object { $_['Id'] }) `
                 -Recommendation 'Delete orphaned DCRs, or associate them with their intended resources if still needed.' `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/data-collection-rule-overview' `
                 -Evidence @{ names = @($orphanedDcrs | ForEach-Object { $_['Name'] }) }))
         }
     }

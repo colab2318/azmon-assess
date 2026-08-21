@@ -36,6 +36,7 @@ function Find-AzMonConsolidationFinding {
         -Recommendation ('Adopt a hub-and-spoke workspace design: 1 workspace per region per sensitivity tier ' +
             '(prod, non-prod, security/core). Migrate using diagnostic-setting re-pointing. See docs: ' +
             'https://learn.microsoft.com/azure/azure-monitor/logs/workspace-design') `
+        -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/workspace-design' `
         -Evidence @{ group_summary = $groupSummary.ToArray() }))
 
     foreach ($key in $groups.Keys) {
@@ -63,6 +64,7 @@ function Find-AzMonConsolidationFinding {
             -Recommendation ('Create a single target workspace, re-point diagnostic settings, migrate legacy ' +
                 'alerts to scheduled-query rules against the target workspace, then decommission source ' +
                 'workspaces after a 30-day parallel-run.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/workspace-design' `
             -Evidence @{
                 daily_gb   = [Math]::Round($dailyGb, 2)
                 workspaces = @($wsList | ForEach-Object { @{ name = $_['Name']; id = $_['Id']; gb_30d = $_['IngestionGb30d'] } })
@@ -82,6 +84,7 @@ function Find-AzMonConsolidationFinding {
                 -ResourceIds @($ws['Id']) -EstimatedMonthlySavingsUsd $extraCost `
                 -Recommendation ('Reduce interactive retention to 30 days; enable Archive tier for tables that ' +
                     'still require long-term access (~10x cheaper than interactive).') `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/data-retention-configure' `
                 -Evidence @{ retention_days = $retention; gb_30d = $ws['IngestionGb30d'] }))
         }
     }

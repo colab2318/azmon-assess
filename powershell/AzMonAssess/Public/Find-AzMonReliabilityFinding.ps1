@@ -46,6 +46,7 @@ function Find-AzMonReliabilityFinding {
                 -Recommendation ('Plan a migration to an AZ-enabled region (e.g., eastus2, westus2, westeurope). ' +
                     'If moving the workspace is not feasible, add a secondary workspace in an AZ region and ' +
                     'dual-write diagnostic settings for mission-critical resources.') `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/availability-zones' `
                 -Evidence @{ location = $ws['Location']; az_capable = $false }))
         }
     }
@@ -71,7 +72,8 @@ function Find-AzMonReliabilityFinding {
                     'account or Event Hub for at least 90-day retention off the analytics path.') `
                 -ResourceIds @($resourceId) `
                 -Recommendation ('Add a second destination (storage account for cheap long-term retention or a ' +
-                    'paired workspace in another region) to the diagnostic setting.')))
+                    'paired workspace in another region) to the diagnostic setting.') `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/diagnostic-settings'))
         }
     }
 
@@ -93,7 +95,8 @@ function Find-AzMonReliabilityFinding {
                 'failures will go undetected until users notice missing data or broken dashboards.') `
             -ResourceIds @($ws['Id']) `
             -Recommendation ('Deploy a metric alert on Heartbeat (or a log query alert on Operation table) to ' +
-                'fire when ingestion stops for >30 min. Link it to the primary action group.')))
+                'fire when ingestion stops for >30 min. Link it to the primary action group.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-analytics-workspace-health'))
     }
 
     $wsById = @{}
@@ -111,6 +114,7 @@ function Find-AzMonReliabilityFinding {
                 -ResourceIds @($ai['Id']) `
                 -Recommendation ('Re-create the AI resource in an AZ-capable region colocated with the backing ' +
                     'workspace, then migrate SDK connection strings during the next release.') `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/availability-zones' `
                 -Evidence @{ location = $ai['Location']; workspace_location = $parent['Location'] }))
         }
     }
@@ -138,6 +142,7 @@ function Find-AzMonReliabilityFinding {
             -Recommendation ('Create an activity log alert scoped to the subscription with condition ' +
                 'category=ServiceHealth, covering Service issues, Planned maintenance, and Security advisories, ' +
                 'routed to the primary action group.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/service-health/alerts-activity-log-service-notifications-arm' `
             -Evidence @{ subscription_ids = $uncoveredSubs }))
     }
 

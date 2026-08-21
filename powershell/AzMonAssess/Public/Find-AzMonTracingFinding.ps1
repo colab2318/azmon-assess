@@ -35,6 +35,7 @@ function Find-AzMonTracingFinding {
                 "3. Deploy the OpenTelemetry Collector as a sidecar in AKS for services that cannot embed the SDK.`n" +
                 "4. Configure trace-based sampling at 5-10% to control cost."
             ) `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/app/opentelemetry-enable' `
             -Evidence @{ candidate_count = $candidates.Count; workspace_based_ai_count = $aiWorkspaceBased.Count; candidate_types = $byType }))
     }
 

@@ -30,6 +30,7 @@ function Find-AzMonPerformanceFinding {
                 -Recommendation ('Recreate App Insights in the same region as the backing workspace (ideally ' +
                     'colocated with the monitored workload), migrate connection strings on next release, then ' +
                     'retire the mis-regioned resource.') `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/workspace-design' `
                 -Evidence @{ ai_location = $ai['Location']; workspace_location = $ws['Location'] }))
         }
     }
@@ -46,6 +47,7 @@ function Find-AzMonPerformanceFinding {
                 -Recommendation ('Create a dedicated cluster with a 500 GB/day commit tier and link this ' +
                     'workspace (plus any peer workspaces in the same region). Model with Azure Pricing Calculator ' +
                     'vs. current pay-as-you-go cost first.') `
+                -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-dedicated-clusters' `
                 -Evidence @{ ingestion_gb_30d = $gb30 }))
         }
     }
@@ -70,6 +72,7 @@ function Find-AzMonPerformanceFinding {
             -ResourceIds @($ws['Id']) `
             -Recommendation ('Move these tables to Basic tier with retention capped at 30d, then attach a ' +
                 'long-term storage account. Rehydrate via Search Jobs on demand.') `
+            -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/search-jobs' `
             -Evidence @{ tables = @($candidates | ForEach-Object { , @($_.Table, $_.Gb) }); retention_days = $ws['RetentionDays'] }))
     }
 
