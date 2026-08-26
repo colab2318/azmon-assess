@@ -163,6 +163,10 @@ function Invoke-AzMonVerification {
     if (-not $CurrentSnapshotPath -and -not $Live) {
         throw 'Invoke-AzMonVerification requires either -CurrentSnapshotPath (an already-generated fresh snapshot) or -Live (re-collect from Azure now).'
     }
+    if (-not (Test-Path -LiteralPath $SnapshotPath)) { throw "-SnapshotPath not found: $SnapshotPath" }
+    if ($CurrentSnapshotPath -and -not (Test-Path -LiteralPath $CurrentSnapshotPath)) {
+        throw "-CurrentSnapshotPath not found: $CurrentSnapshotPath - check the path (it must already exist; this command does not create it), or use -Live to re-collect from Azure instead."
+    }
 
     $snapshotDir = Split-Path -Parent (Resolve-Path -LiteralPath $SnapshotPath).Path
     if (-not $ReportPath) { $ReportPath = Join-Path $snapshotDir 'report.xlsx' }

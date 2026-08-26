@@ -22,6 +22,7 @@ function Import-AzMonSnapshot {
     #>
     [CmdletBinding()]
     param([Parameter(Mandatory)] [string] $Path)
+    if (-not (Test-Path -LiteralPath $Path)) { throw "Snapshot not found: $Path" }
     $raw = Get-Content -LiteralPath $Path -Raw
     $snap = $raw | ConvertFrom-Json -AsHashtable -Depth 25
     # Heals snapshots saved before the Invoke-AzMonGraphQuery data:null fix
