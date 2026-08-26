@@ -44,10 +44,17 @@ function Get-AzMonFindingCheckKey {
         both disabled AND missing severity, both category 'alerting') -
         without CheckId, fixing just one makes the OTHER still-open
         finding mask it as "still open" for both.
+    .PARAMETER UseCheckId
+        Must be the SAME value for both the original and the fresh finding
+        set being compared. If the original snapshot predates CheckId, its
+        findings can never match a fresh finding's real CheckId (different
+        key spaces entirely) - pass $false to force Category-only matching
+        consistently on both sides instead of silently comparing
+        incompatible keys.
     #>
     [CmdletBinding()]
-    param([Parameter(Mandatory)] [hashtable] $Finding)
-    if ($Finding['CheckId']) { return $Finding['CheckId'] }
+    param([Parameter(Mandatory)] [hashtable] $Finding, [bool] $UseCheckId = $true)
+    if ($UseCheckId -and $Finding['CheckId']) { return $Finding['CheckId'] }
     return $Finding['Category']
 }
 
@@ -65,12 +72,13 @@ function Find-AzMonVerificationStatusUpdate {
         [Parameter(Mandatory)] [System.Collections.Generic.HashSet[string]] $OpenSignature,
         [Parameter(Mandatory)] [hashtable] $FreshLookup,
         [Parameter(Mandatory)] [System.Collections.Generic.HashSet[string]] $FreshSubscriptionId,
-        [Parameter(Mandatory)] [hashtable] $PriorStatus
+        [Parameter(Mandatory)] [hashtable] $PriorStatus,
+        [bool] $UseCheckId = $true
     )
     $updates = [System.Collections.Generic.List[hashtable]]::new()
 
     foreach ($f in $OriginalFinding) {
-        $checkKey = Get-AzMonFindingCheckKey -Finding $f
+        $checkKey = Get-AzMonFindingCheckKey -Finding $f -UseCheckId $UseCheckId
         $resourceIds = @($f['ResourceIds'])
         foreach ($rid in $resourceIds) {
             if (-not $rid) { continue }
@@ -196,6 +204,13 @@ function Invoke-AzMonVerification {
     $originalFindings = @($snapshot['Findings'])
     Write-Host "[azmon-assess] Verifying $($originalFindings.Count) finding(s) from $SnapshotPath against the current environment..." -ForegroundColor Cyan
 
+    $useCheckId = [bool]($originalFindings | Where-Object { $_['CheckId'] } | Select-Object -First 1)
+    if ($originalFindings.Count -gt 0 -and -not $useCheckId) {
+        Write-Warning ("$SnapshotPath predates CheckId support (regenerated before this feature shipped). Falling back to " +
+            'Category-only matching for this run, which cannot tell apart multiple finding types on the same resource ' +
+            "within one category - re-run 'run'/'demo' to produce a fresh baseline snapshot for full accuracy.")
+    }
+
     if ($CurrentSnapshotPath) {
         $freshSnapshot = Import-AzMonSnapshot -Path $CurrentSnapshotPath
     } else {
@@ -210,7 +225,7 @@ function Invoke-AzMonVerification {
 
     $openSignature = [System.Collections.Generic.HashSet[string]]::new()
     foreach ($f in $freshFindings) {
-        $checkKey = Get-AzMonFindingCheckKey -Finding $f
+        $checkKey = Get-AzMonFindingCheckKey -Finding $f -UseCheckId $useCheckId
         foreach ($rid in @($f['ResourceIds'])) {
             if (-not $rid) { continue }
             [void]$openSignature.Add("$checkKey|$(([string]$rid).ToLowerInvariant())")
@@ -222,7 +237,7 @@ function Invoke-AzMonVerification {
 
     $priorStatus = Get-AzMonExcelReviewStatus -Path $ReportPath -SheetName '4.ImpactedResourcesAnalysis'
     $updates = @(Find-AzMonVerificationStatusUpdate -OriginalFinding $originalFindings -OpenSignature $openSignature `
-            -FreshLookup $freshLookup -FreshSubscriptionId $freshSubscriptionId -PriorStatus $priorStatus)
+            -FreshLookup $freshLookup -FreshSubscriptionId $freshSubscriptionId -PriorStatus $priorStatus -UseCheckId $useCheckId)
     Write-Host "[azmon-assess] $($updates.Count) row(s) will change status." -ForegroundColor DarkCyan
 
     $applied = @(Update-AzMonExcelReviewStatus -Path $ReportPath -SheetName '4.ImpactedResourcesAnalysis' -StatusUpdate $updates)
