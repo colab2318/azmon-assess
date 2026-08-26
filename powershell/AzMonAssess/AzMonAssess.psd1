@@ -42,6 +42,7 @@
         'New-AzMonHtmlReport'
         'Invoke-AzMonTriage'
         'Invoke-AzMonRemediation'
+        'Invoke-AzMonVerification'
     )
     CmdletsToExport      = @()
     VariablesToExport    = @()

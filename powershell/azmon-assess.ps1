@@ -7,7 +7,7 @@
     Thin command-style wrapper around the AzMonAssess module, mirroring the
     original Python CLI's commands: run, consolidate, gaps, alerts, cost,
     tracing, reliability, security, performance, demo, report, summarize,
-    triage, remediate.
+    triage, remediate, verify.
 .PARAMETER Command
     Which action to run.
 .EXAMPLE
@@ -28,12 +28,16 @@
 .EXAMPLE
     ./azmon-assess.ps1 remediate -Snapshot ./out/snapshot.json -TriagePath ./out/triage.json -Output ./out
     Dry-run every finding triaged as "accept" (add -Apply to actually change Azure).
+.EXAMPLE
+    ./azmon-assess.ps1 verify -Snapshot ./out/snapshot.json -Live
+    Re-check every finding against the current Azure environment and mark
+    resolved ones "Reviewed - Implemented" directly in report.xlsx.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory, Position = 0)]
     [ValidateSet('run', 'consolidate', 'gaps', 'alerts', 'cost', 'tracing', 'reliability', 'security', 'performance',
-        'demo', 'report', 'summarize', 'triage', 'remediate')]
+        'demo', 'report', 'summarize', 'triage', 'remediate', 'verify')]
     [string] $Command,
 
     [Alias('o')] [string] $Output = './out',
@@ -64,7 +68,11 @@ param(
     [string[]] $Only,
     [double] $DailyQuotaGb = 50.0,
     [int] $RetentionDays = 30,
-    [double] $SamplingPercentage = 10.0
+    [double] $SamplingPercentage = 10.0,
+
+    [string] $ReportPath,
+    [string] $CurrentSnapshot,
+    [switch] $Live
 )
 
 $ErrorActionPreference = 'Stop'
@@ -72,6 +80,10 @@ Import-Module (Join-Path $PSScriptRoot 'AzMonAssess/AzMonAssess.psd1') -Force
 
 $azureCommands = @('run', 'consolidate', 'gaps', 'alerts', 'cost', 'tracing', 'reliability', 'security', 'performance', 'remediate')
 if ($Command -in $azureCommands) {
+    Initialize-AzMonPrerequisite
+    Connect-AzMonSession -TenantId $TenantId | Out-Null
+}
+if ($Command -eq 'verify' -and $Live) {
     Initialize-AzMonPrerequisite
     Connect-AzMonSession -TenantId $TenantId | Out-Null
 }
@@ -129,5 +141,13 @@ switch ($Command) {
         Invoke-AzMonRemediation -SnapshotPath $Snapshot -TriagePath $TriagePath -OutputPath $Output -Apply:$Apply `
             -ActionGroupId $ActionGroup -OnlyCategory $Only -DailyQuotaGb $DailyQuotaGb -RetentionDays $RetentionDays `
             -SamplingPercentage $SamplingPercentage | Out-Null
+    }
+
+    'verify' {
+        if (-not $Snapshot) { throw '-Snapshot is required for the verify command.' }
+        if (-not $CurrentSnapshot -and -not $Live) { throw 'The verify command needs either -CurrentSnapshot <path> or -Live.' }
+        Invoke-AzMonVerification -SnapshotPath $Snapshot -ReportPath $ReportPath -OutputPath $Output `
+            -CurrentSnapshotPath $CurrentSnapshot -Live:$Live -SubscriptionId $SubscriptionId -ManagementGroupId $ManagementGroupId `
+            -LookbackDays $LookbackDays -ThrottleLimit $ThrottleLimit | Out-Null
     }
 }

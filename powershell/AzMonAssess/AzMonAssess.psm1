@@ -49,4 +49,5 @@ Export-ModuleMember -Function @(
     'New-AzMonHtmlReport'
     'Invoke-AzMonTriage'
     'Invoke-AzMonRemediation'
+    'Invoke-AzMonVerification'
 )
