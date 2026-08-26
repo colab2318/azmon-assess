@@ -73,7 +73,8 @@ function Find-AzMonVerificationStatusUpdate {
         [Parameter(Mandatory)] [hashtable] $FreshLookup,
         [Parameter(Mandatory)] [System.Collections.Generic.HashSet[string]] $FreshSubscriptionId,
         [Parameter(Mandatory)] [hashtable] $PriorStatus,
-        [bool] $UseCheckId = $true
+        [bool] $UseCheckId = $true,
+        [System.Collections.Generic.List[hashtable]] $Trace
     )
     $updates = [System.Collections.Generic.List[hashtable]]::new()
 
@@ -113,6 +114,21 @@ function Find-AzMonVerificationStatusUpdate {
                         Title          = $f['Title']
                         PreviousStatus = $prior
                         NewStatus      = $newStatus
+                        Reason         = $reason
+                    })
+            }
+            if ($null -ne $Trace) {
+                $Trace.Add(@{
+                        FindingId      = $f['Id']
+                        CheckId        = $f['CheckId']
+                        CheckKeyUsed   = $checkKey
+                        Category       = $f['Category']
+                        Title          = $f['Title']
+                        ResourceId     = $rid
+                        StillOpen      = $stillOpen
+                        PreviousStatus = $prior
+                        ComputedStatus = $newStatus
+                        WillChange     = ($newStatus -ne $prior)
                         Reason         = $reason
                     })
             }
@@ -173,6 +189,12 @@ function Invoke-AzMonVerification {
         Invoke-AzMonVerification -SnapshotPath ./out/snapshot.json -Live
     .EXAMPLE
         Invoke-AzMonVerification -SnapshotPath ./out/snapshot.json -CurrentSnapshotPath ./out-rerun/snapshot.json
+    .PARAMETER Detail
+        Also write verification-detail.json: one row per (finding,
+        resource) actually EVALUATED (not just ones that changed), with
+        the CheckId used, whether it was still found open in the fresh
+        check, and the resulting decision - use this to see exactly why a
+        specific finding did or didn't change status.
     #>
     [CmdletBinding()]
     param(
@@ -184,7 +206,8 @@ function Invoke-AzMonVerification {
         [string[]] $SubscriptionId,
         [string] $ManagementGroupId,
         [int] $LookbackDays,
-        [int] $ThrottleLimit
+        [int] $ThrottleLimit,
+        [switch] $Detail
     )
 
     if (-not $CurrentSnapshotPath -and -not $Live) {
@@ -236,16 +259,28 @@ function Invoke-AzMonVerification {
     foreach ($s in @($freshSnapshot['SubscriptionIds'])) { [void]$freshSubscriptionId.Add(([string]$s).ToLowerInvariant()) }
 
     $priorStatus = Get-AzMonExcelReviewStatus -Path $ReportPath -SheetName '4.ImpactedResourcesAnalysis'
+    if ($Detail) {
+        $trace = [System.Collections.Generic.List[hashtable]]::new()
+    } else {
+        $trace = $null
+    }
     $updates = @(Find-AzMonVerificationStatusUpdate -OriginalFinding $originalFindings -OpenSignature $openSignature `
-            -FreshLookup $freshLookup -FreshSubscriptionId $freshSubscriptionId -PriorStatus $priorStatus -UseCheckId $useCheckId)
+            -FreshLookup $freshLookup -FreshSubscriptionId $freshSubscriptionId -PriorStatus $priorStatus -UseCheckId $useCheckId -Trace $trace)
     Write-Host "[azmon-assess] $($updates.Count) row(s) will change status." -ForegroundColor DarkCyan
 
     $applied = @(Update-AzMonExcelReviewStatus -Path $ReportPath -SheetName '4.ImpactedResourcesAnalysis' -StatusUpdate $updates)
 
+    $outDir = New-AzMonOutputDirectory -Path $OutputPath
+
+    if ($Detail) {
+        $detailPath = Join-Path $outDir 'verification-detail.json'
+        ($trace.ToArray() | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $detailPath -Encoding utf8NoBOM
+        Write-Host "[azmon-assess] Full per-row detail (all $($trace.Count) evaluated rows) written to $detailPath" -ForegroundColor Green
+    }
+
     $updatesByKey = @{}
     foreach ($u in $updates) { $updatesByKey["$($u.FindingId)|$(([string]$u.ResourceId).ToLowerInvariant())"] = $u }
 
-    $outDir = New-AzMonOutputDirectory -Path $OutputPath
     $logPath = Join-Path $outDir 'verification-log.json'
     $existingLog = @()
     if (Test-Path -LiteralPath $logPath) {

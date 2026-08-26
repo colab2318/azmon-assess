@@ -72,7 +72,8 @@ param(
 
     [string] $ReportPath,
     [string] $CurrentSnapshot,
-    [switch] $Live
+    [switch] $Live,
+    [switch] $Detail
 )
 
 $ErrorActionPreference = 'Stop'
@@ -148,6 +149,6 @@ switch ($Command) {
         if (-not $CurrentSnapshot -and -not $Live) { throw 'The verify command needs either -CurrentSnapshot <path> or -Live.' }
         Invoke-AzMonVerification -SnapshotPath $Snapshot -ReportPath $ReportPath -OutputPath $Output `
             -CurrentSnapshotPath $CurrentSnapshot -Live:$Live -SubscriptionId $SubscriptionId -ManagementGroupId $ManagementGroupId `
-            -LookbackDays $LookbackDays -ThrottleLimit $ThrottleLimit | Out-Null
+            -LookbackDays $LookbackDays -ThrottleLimit $ThrottleLimit -Detail:$Detail | Out-Null
     }
 }
