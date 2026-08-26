@@ -27,6 +27,7 @@ function Find-AzMonAlertQualityFinding {
     if ($disabled.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'alerting' -Severity 'medium' `
             -Title "$($disabled.Count) disabled alert rules" `
+            -CheckId 'alerting.disabled-rules' `
             -Detail ('Disabled rules are common sources of drift - either delete them or re-enable and tune. ' +
                 'Disabled rules are a frequent cause of missing critical alerts.') `
             -ResourceIds @($disabled | ForEach-Object { $_['Id'] }) `
@@ -39,6 +40,7 @@ function Find-AzMonAlertQualityFinding {
     if ($silent.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'alerting' -Severity 'high' `
             -Title "$($silent.Count) enabled alert rules have NO action group" `
+            -CheckId 'alerting.silent-rules' `
             -Detail 'These rules fire but notify nobody - a common cause of missed critical incidents.' `
             -ResourceIds @($silent | ForEach-Object { $_['Id'] }) `
             -Recommendation ('Attach a standard action group (see bicep/action-group.bicep). For business-critical ' +
@@ -51,6 +53,7 @@ function Find-AzMonAlertQualityFinding {
     if ($orphans.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'alerting' -Severity 'low' `
             -Title "$($orphans.Count) action groups are not referenced by any rule" `
+            -CheckId 'alerting.orphaned-action-groups' `
             -Detail 'Unused action groups add clutter and confuse on-call rotation.' `
             -ResourceIds @($orphans | ForEach-Object { $_['Id'] }) `
             -Recommendation 'Delete or repurpose these action groups.' `
@@ -62,6 +65,7 @@ function Find-AzMonAlertQualityFinding {
     if ($unsevered.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'alerting' -Severity 'low' `
             -Title "$($unsevered.Count) rules do not set an explicit severity" `
+            -CheckId 'alerting.missing-severity' `
             -Detail 'Without severity, correlation and routing become inconsistent.' `
             -ResourceIds @($unsevered | Select-Object -First 100 | ForEach-Object { $_['Id'] }) `
             -Recommendation 'Set severity 0-4 explicitly on all rules; standardize per runbook.' `
@@ -77,6 +81,7 @@ function Find-AzMonAlertQualityFinding {
     if ($noisy.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'alerting' -Severity 'medium' `
             -Title "$($noisy.Count) rules fired $noisyThreshold+ times in the last 30 days (noisy)" `
+            -CheckId 'alerting.noisy-rules' `
             -Detail ('High-frequency rules dominate on-call attention and train responders to ignore alerts. ' +
                 'Fire counts are matched to rules by name via Resource Graph''s AlertsManagementResources table.') `
             -ResourceIds @($noisy | Select-Object -First 50 | ForEach-Object { $_['Id'] }) `
@@ -118,6 +123,7 @@ function Find-AzMonAlertQualityFinding {
         $totalUncovered = ($uncovered | Measure-Object -Property Count -Sum).Sum
         $findings.Add((New-AzMonFinding -Category 'alerting' -Severity 'high' `
             -Title "$totalUncovered resources across $($uncovered.Count) critical types have NO alert rule scoped to them" `
+            -CheckId 'alerting.missing-baseline-alerts' `
             -Detail ('Recommended baseline alerts (availability, error-rate, throttling) are missing. Combined ' +
                 "with the 'silent rules' finding, this explains under-alerting.") `
             -Recommendation ('Deploy the included Bicep alert-baseline (bicep/alert-baseline.bicep) which creates ' +
@@ -136,6 +142,7 @@ function Find-AzMonAlertQualityFinding {
     if ($broadScope.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'alerting' -Severity 'low' `
             -Title "$($broadScope.Count) metric alert rules are scoped to $broadScopeThreshold+ resources" `
+            -CheckId 'alerting.broad-scope-metric-alerts' `
             -Detail ('Metric alert rules bill and evaluate per monitored resource-metric-dimension combination, ' +
                 'so very broad rules can become a meaningful cost driver. A log search alert against the same ' +
                 'resources is often cheaper at this scale.') `
@@ -158,6 +165,7 @@ function Find-AzMonAlertQualityFinding {
     if ($highFreqLogAlerts.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'alerting' -Severity 'low' `
             -Title "$($highFreqLogAlerts.Count) log search alerts evaluate every $highFreqThresholdMinutes minutes or less" `
+            -CheckId 'alerting.high-frequency-log-alerts' `
             -Detail ('Log search (scheduled query) alerts are billed and executed on every evaluation cycle, so ' +
                 'sub-5-minute frequency on rules that do not need near-real-time detection is a direct, avoidable ' +
                 'cost driver.') `
@@ -177,6 +185,7 @@ function Find-AzMonAlertQualityFinding {
     if ($staticOnlyMetricAlerts.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'alerting' -Severity 'low' `
             -Title "$($staticOnlyMetricAlerts.Count) enabled metric alerts use only static thresholds" `
+            -CheckId 'alerting.static-threshold-only' `
             -Detail ('Static thresholds do not adapt to normal workload variation (time-of-day, day-of-week, ' +
                 'seasonal growth), which is a common cause of both alert fatigue and missed real degradations. ' +
                 'Dynamic thresholds learn a baseline per metric and adjust automatically.') `

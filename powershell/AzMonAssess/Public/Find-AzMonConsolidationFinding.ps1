@@ -29,6 +29,7 @@ function Find-AzMonConsolidationFinding {
     $findings.Add((New-AzMonFinding -Category 'consolidation' `
         -Severity $(if ($total -ge 10) { 'high' } else { 'medium' }) `
         -Title "$total Log Analytics workspaces detected — evaluate consolidation" `
+        -CheckId 'consolidation.workspace-count' `
         -Detail ("Detected $total workspaces across $regionCount regions. Consolidating to per-region-per-environment " +
             '(prod / non-prod / core) typically unlocks commitment-tier discounts of 20-40% and simplifies ' +
             'cross-service correlation for App Insights and infrastructure telemetry.') `
@@ -56,6 +57,7 @@ function Find-AzMonConsolidationFinding {
         $findings.Add((New-AzMonFinding -Category 'consolidation' `
             -Severity $(if ($savings -gt 500) { 'high' } else { 'medium' }) `
             -Title "Consolidation candidate — $($wsList.Count) workspaces in $region / env=$envName" `
+            -CheckId 'consolidation.candidate-group' `
             -Detail ("Combined ingestion approx $dailyGbRounded GB/day. Merging into a single workspace and " +
                 "applying the best-fit commitment tier reduces list price from $(Format-AzMonUsd $paygMonthly)/mo " +
                 "(PAYG) to $(Format-AzMonUsd $best.MonthlyCost)/mo.") `
@@ -79,6 +81,7 @@ function Find-AzMonConsolidationFinding {
             $extraCost = [Math]::Round($gb30 * 0.10 * ($extraDays / 30.0), 2)
             $findings.Add((New-AzMonFinding -Category 'retention' -Severity 'medium' `
                 -Title "Workspace $($ws['Name']): interactive retention ${retention}d" `
+                -CheckId 'retention.interactive-retention-high' `
                 -Detail ('Interactive retention above 30 days incurs additional cost. If long-term retention is ' +
                     'satisfied by another system (SIEM, cold storage, MSSP), reduce interactive retention.') `
                 -ResourceIds @($ws['Id']) -EstimatedMonthlySavingsUsd $extraCost `

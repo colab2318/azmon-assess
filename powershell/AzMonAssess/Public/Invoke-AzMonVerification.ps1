@@ -33,12 +33,30 @@ function Test-AzMonResourceStillExists {
     return $false
 }
 
+function Get-AzMonFindingCheckKey {
+    <#
+    .SYNOPSIS
+        The signature component identifying WHICH check/rule raised a
+        finding - CheckId when present, falling back to Category for
+        snapshots saved before CheckId existed. Using bare Category alone
+        is NOT enough: several distinct finding types commonly fire for
+        the same resource within one category (e.g. an alert rule that is
+        both disabled AND missing severity, both category 'alerting') -
+        without CheckId, fixing just one makes the OTHER still-open
+        finding mask it as "still open" for both.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [hashtable] $Finding)
+    if ($Finding['CheckId']) { return $Finding['CheckId'] }
+    return $Finding['Category']
+}
+
 function Find-AzMonVerificationStatusUpdate {
     <#
     .SYNOPSIS
         Core reconciliation: for every (finding, resource) row in the
         original snapshot, decides whether the current environment still
-        exhibits the same (Category, ResourceId) condition, and returns
+        exhibits the same (CheckId, ResourceId) condition, and returns
         only the rows whose status should actually change.
     #>
     [CmdletBinding()]
@@ -52,13 +70,14 @@ function Find-AzMonVerificationStatusUpdate {
     $updates = [System.Collections.Generic.List[hashtable]]::new()
 
     foreach ($f in $OriginalFinding) {
+        $checkKey = Get-AzMonFindingCheckKey -Finding $f
         $resourceIds = @($f['ResourceIds'])
         foreach ($rid in $resourceIds) {
             if (-not $rid) { continue }
             $ridLower = ([string]$rid).ToLowerInvariant()
             $priorKey = "$($f['Id'])|$ridLower"
             $prior = if ($PriorStatus.ContainsKey($priorKey)) { $PriorStatus[$priorKey] } else { $script:AzMonReviewStatus.NotReviewed }
-            $stillOpen = $OpenSignature.Contains("$($f['Category'])|$ridLower")
+            $stillOpen = $OpenSignature.Contains("$checkKey|$ridLower")
 
             $newStatus = $prior
             $reason = $null
@@ -191,9 +210,10 @@ function Invoke-AzMonVerification {
 
     $openSignature = [System.Collections.Generic.HashSet[string]]::new()
     foreach ($f in $freshFindings) {
+        $checkKey = Get-AzMonFindingCheckKey -Finding $f
         foreach ($rid in @($f['ResourceIds'])) {
             if (-not $rid) { continue }
-            [void]$openSignature.Add("$($f['Category'])|$(([string]$rid).ToLowerInvariant())")
+            [void]$openSignature.Add("$checkKey|$(([string]$rid).ToLowerInvariant())")
         }
     }
     $freshLookup = New-AzMonResourceLookup -Snapshot $freshSnapshot

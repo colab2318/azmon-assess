@@ -39,6 +39,7 @@ function Find-AzMonReliabilityFinding {
         if ($loc -and ($azRegions -notcontains $loc)) {
             $findings.Add((New-AzMonFinding -Category 'reliability' -Severity $(if (Test-AzMonProdTag $ws['Tags']) { 'high' } else { 'medium' }) `
                 -Title "$($ws['Name']): region '$($ws['Location'])' does not support workspace availability zones" `
+                -CheckId 'reliability.workspace-non-az-region' `
                 -Detail ('Workspaces in non-AZ regions have no in-region redundancy. A single datacenter fault ' +
                     'can make log ingestion and query unavailable, breaking incident response for every ' +
                     'downstream service.') `
@@ -67,6 +68,7 @@ function Find-AzMonReliabilityFinding {
             $shortName = ($resourceId -split '/')[-1]
             $findings.Add((New-AzMonFinding -Category 'reliability' -Severity 'medium' `
                 -Title "Prod resource ${shortName}: single log destination (workspace only)" `
+                -CheckId 'reliability.single-log-destination' `
                 -Detail ('For business-critical workloads, a single workspace destination leaves no evidence ' +
                     'trail if the workspace becomes unavailable. WAF recommends dual-writing to a storage ' +
                     'account or Event Hub for at least 90-day retention off the analytics path.') `
@@ -91,6 +93,7 @@ function Find-AzMonReliabilityFinding {
         if (([double]($ws['IngestionGb30d'] ?? 0)) -lt 1) { continue }
         $findings.Add((New-AzMonFinding -Category 'reliability' -Severity 'medium' `
             -Title "$($ws['Name']): no health / ingestion alert configured on the workspace" `
+            -CheckId 'reliability.workspace-no-health-alert' `
             -Detail ('There is no alert rule scoped to this workspace. Ingestion outages, quota hits, or query ' +
                 'failures will go undetected until users notice missing data or broken dashboards.') `
             -ResourceIds @($ws['Id']) `
@@ -109,6 +112,7 @@ function Find-AzMonReliabilityFinding {
         if ($aiLoc -and ($azRegions -notcontains $aiLoc)) {
             $findings.Add((New-AzMonFinding -Category 'reliability' -Severity 'medium' `
                 -Title "App Insights '$($ai['Name'])' in non-AZ region '$($ai['Location'])'" `
+                -CheckId 'reliability.ai-non-az-region' `
                 -Detail ('Application Insights ingestion in a non-AZ region shares fate with a single datacenter. ' +
                     'During a zonal fault, telemetry from the monitored app is lost - exactly when it is most needed.') `
                 -ResourceIds @($ai['Id']) `
@@ -135,6 +139,7 @@ function Find-AzMonReliabilityFinding {
     if ($uncoveredSubs.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'reliability' -Severity 'medium' `
             -Title "$($uncoveredSubs.Count) subscription(s) have no Azure Service Health alert configured" `
+            -CheckId 'reliability.service-health-alert-missing' `
             -Detail ('Without a Service Health alert, Azure service outages, planned maintenance, and health ' +
                 'advisories affecting your resources are only visible by checking the portal manually - they are ' +
                 'never proactively pushed to your team.') `

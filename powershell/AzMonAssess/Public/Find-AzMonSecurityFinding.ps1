@@ -17,6 +17,7 @@ function Find-AzMonSecurityFinding {
                 $dirTitle = (Get-Culture).TextInfo.ToTitleCase($pair.Direction)
                 $findings.Add((New-AzMonFinding -Category 'security' -Severity $(if (Test-AzMonProdTag $ws['Tags']) { 'high' } else { 'medium' }) `
                     -Title "$($ws['Name']): public network access for $($pair.Direction) is Enabled" `
+                    -CheckId 'security.workspace-public-network-access' `
                     -Detail ('Any client with a valid workspace key or Entra token can reach the workspace over ' +
                         'the public internet. WAF requires network isolation for prod workloads via a Private ' +
                         'Link Scope (AMPLS) or firewall.') `
@@ -34,6 +35,7 @@ function Find-AzMonSecurityFinding {
         if ($ws['DisableLocalAuth'] -eq $false) {
             $findings.Add((New-AzMonFinding -Category 'security' -Severity 'high' `
                 -Title "$($ws['Name']): workspace shared-key (local) authentication is enabled" `
+                -CheckId 'security.workspace-local-auth-enabled' `
                 -Detail ('Shared-key auth bypasses Entra ID conditional access and MFA. Rotating compromised keys ' +
                     'requires updating every agent/app manually. WAF and Defender for Cloud both recommend ' +
                     'Entra-only ingestion.') `
@@ -53,6 +55,7 @@ function Find-AzMonSecurityFinding {
                 $dirTitle = (Get-Culture).TextInfo.ToTitleCase($pair.Direction)
                 $findings.Add((New-AzMonFinding -Category 'security' -Severity 'medium' `
                     -Title "App Insights '$($ai['Name'])': public network access for $($pair.Direction) is Enabled" `
+                    -CheckId 'security.ai-public-network-access' `
                     -Detail ('Telemetry ingestion and query are reachable from the public internet. For prod apps ' +
                         'behind Private Link, telemetry becomes the weakest link for data exfiltration.') `
                     -ResourceIds @($ai['Id']) `
@@ -68,6 +71,7 @@ function Find-AzMonSecurityFinding {
         if ($ai['DisableLocalAuth'] -eq $false) {
             $findings.Add((New-AzMonFinding -Category 'security' -Severity 'medium' `
                 -Title "App Insights '$($ai['Name'])': instrumentation-key auth (local auth) is enabled" `
+                -CheckId 'security.ai-local-auth-enabled' `
                 -Detail ('When local auth is enabled, any leaked instrumentation key allows telemetry injection ' +
                     'or exfiltration. WAF recommends Entra-only ingestion for prod telemetry pipelines.') `
                 -ResourceIds @($ai['Id']) `
@@ -82,6 +86,7 @@ function Find-AzMonSecurityFinding {
         if (-not $ai['WorkspaceResourceId']) {
             $findings.Add((New-AzMonFinding -Category 'security' -Severity 'high' `
                 -Title "App Insights '$($ai['Name'])': classic (non-workspace-based) resource" `
+                -CheckId 'security.ai-classic' `
                 -Detail ('Classic App Insights is deprecated (retirement Feb 2024 completed). It cannot ' +
                     'participate in RBAC-scoped queries, cross-workspace joins, or workspace-level security ' +
                     'controls like Private Link and CMK.') `
@@ -103,6 +108,7 @@ function Find-AzMonSecurityFinding {
         if ($aiPub -and $wsPub -and $aiPub -ne $wsPub) {
             $findings.Add((New-AzMonFinding -Category 'security' -Severity 'medium' `
                 -Title "App Insights '$($ai['Name'])' network policy diverges from parent workspace '$($ws['Name'])'" `
+                -CheckId 'security.ai-workspace-network-policy-mismatch' `
                 -Detail ('Ingestion policy is inconsistent between the AI resource and the underlying workspace. ' +
                     'Attackers can pivot through the more permissive endpoint. Both must be aligned for effective ' +
                     'network isolation.') `

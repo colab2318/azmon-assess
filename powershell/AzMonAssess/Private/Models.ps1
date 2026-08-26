@@ -239,6 +239,7 @@ function New-AzMonFinding {
         [Parameter(Mandatory)] [ValidateSet('critical', 'high', 'medium', 'low', 'info')] [string] $Severity,
         [Parameter(Mandatory)] [string] $Title,
         [Parameter(Mandatory)] [string] $Detail,
+        [Parameter(Mandatory)] [string] $CheckId,
         [string[]] $ResourceIds = @(),
         [Nullable[double]] $EstimatedMonthlySavingsUsd,
         [string] $Recommendation,
@@ -248,6 +249,7 @@ function New-AzMonFinding {
     @{
         Kind                       = 'Finding'
         Id                         = [guid]::NewGuid().ToString()
+        CheckId                    = $CheckId
         Category                   = $Category
         Severity                   = $Severity
         Title                      = $Title

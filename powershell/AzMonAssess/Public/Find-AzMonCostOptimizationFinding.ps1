@@ -36,6 +36,7 @@ function Find-AzMonCostOptimizationFinding {
         $savings = [Math]::Round($sumGb * 2.0, 2)
         $findings.Add((New-AzMonFinding -Category 'cost' -Severity $(if ($savings -gt 200) { 'high' } else { 'medium' }) `
             -Title "$($ws['Name']): $($candidates.Count) verbose tables good candidates for Basic Logs tier" `
+            -CheckId 'cost.basic-tier-candidate' `
             -Detail ('Basic Logs is ~5x cheaper than Analytics Logs but supports only KQL search (no alerts, no ' +
                 'cross-table joins). Ideal for high-volume tables queried only for incident forensics.') `
             -ResourceIds @($ws['Id']) -EstimatedMonthlySavingsUsd $savings `
@@ -60,6 +61,7 @@ function Find-AzMonCostOptimizationFinding {
         $auxSavings = [Math]::Round($auxSumGb * 2.3, 2)
         $findings.Add((New-AzMonFinding -Category 'cost' -Severity $(if ($auxSavings -gt 200) { 'high' } else { 'medium' }) `
             -Title "$($ws['Name']): $($auxCandidates.Count) audit/security tables good candidates for Auxiliary (Lake) tier" `
+            -CheckId 'cost.auxiliary-tier-candidate' `
             -Detail ('Auxiliary tier ingestion is even cheaper than Basic - built for low-touch, verbose audit ' +
                 'and compliance data like security/OS event logs that are rarely queried interactively and can ' +
                 'tolerate slower query performance.') `
@@ -76,6 +78,7 @@ function Find-AzMonCostOptimizationFinding {
         if ($gb30 -gt 100 -and -not $ws['DailyQuotaGb']) {
             $findings.Add((New-AzMonFinding -Category 'cost' -Severity 'medium' `
                 -Title "$($ws['Name']): no daily quota (dailyQuotaGb) set" `
+                -CheckId 'cost.no-daily-quota' `
                 -Detail ('A daily cap protects against runaway ingestion from misconfigured agents or noisy ' +
                     'applications, preventing surprise bills.') `
                 -ResourceIds @($ws['Id']) `
@@ -91,6 +94,7 @@ function Find-AzMonCostOptimizationFinding {
         if ($null -eq $pct -or $pct -ge 100) {
             $findings.Add((New-AzMonFinding -Category 'cost' -Severity 'low' `
                 -Title "App Insights '$($ai['Name'])': sampling not configured" `
+                -CheckId 'cost.ai-sampling-not-configured' `
                 -Detail ('Adaptive sampling reduces telemetry volume by 50-90% while preserving trends and error ' +
                     'visibility.') `
                 -ResourceIds @($ai['Id']) `
@@ -105,6 +109,7 @@ function Find-AzMonCostOptimizationFinding {
         if ($null -eq $cap -or $cap -le 0) {
             $findings.Add((New-AzMonFinding -Category 'cost' -Severity 'medium' `
                 -Title "App Insights '$($ai['Name'])': no daily volume cap configured" `
+                -CheckId 'cost.ai-no-daily-cap' `
                 -Detail ('Without a daily cap, a stack trace loop or a debug-verbose deployment can 10x monthly ' +
                     'cost overnight before anyone notices. WAF recommends a cap sized ~120% of the P95 daily volume.') `
                 -ResourceIds @($ai['Id']) `
@@ -128,6 +133,7 @@ function Find-AzMonCostOptimizationFinding {
         $savings = [Math]::Round($opsGb * 2.30, 2)
         $findings.Add((New-AzMonFinding -Category 'cost' -Severity $(if ($savings -gt 500) { 'high' } else { 'medium' }) `
             -Title "$($ws['Name']): Sentinel-enabled workspace commingled with $([Math]::Round($opsGb,0)) GB/30d of operational data" `
+            -CheckId 'cost.sentinel-commingling' `
             -Detail ('When Microsoft Sentinel is enabled on a workspace, all ingested data incurs the Sentinel ' +
                 'surcharge - even AppTraces / ContainerLogV2 the SOC never queries. Splitting security and ' +
                 'operational data into separate workspaces removes that surcharge from ops volume.') `
@@ -156,6 +162,7 @@ function Find-AzMonCostOptimizationFinding {
         $savings = [Math]::Round($volumeSaved * 2.30, 2)
         $findings.Add((New-AzMonFinding -Category 'cost' -Severity 'medium' `
             -Title "$($ws['Name']): $($summaryCandidates.Count) tables >100 GB/30d - candidates for Summary Rules" `
+            -CheckId 'cost.summary-rules-candidate' `
             -Detail ('Summary Rules run a scheduled KQL query and write compact rollup rows to a destination ' +
                 'table. For dashboards and long-retention trends you can drop the raw table to Basic (or delete ' +
                 'it) while keeping the aggregates hot.') `
@@ -182,6 +189,7 @@ function Find-AzMonCostOptimizationFinding {
     if ($legacyOnlyVmIds.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'cost' -Severity 'critical' `
             -Title "$($legacyOnlyVmIds.Count) VMs still run the retired Log Analytics agent (MMA/OMS) with no Azure Monitor Agent" `
+            -CheckId 'cost.legacy-mma-agent' `
             -Detail ('The Log Analytics agent (MMA/OMS) was retired on 2024-08-31. Microsoft no longer supports it, ' +
                 'it receives no new distros/service packs, and cloud ingestion for it is being shut down - after ' +
                 '2026-03-02, data upload from this agent can stop at any time without further notice. Every VM ' +
@@ -216,6 +224,7 @@ function Find-AzMonCostOptimizationFinding {
         if ($savings -lt 100) { continue }
         $findings.Add((New-AzMonFinding -Category 'cost' -Severity $(if ($savings -gt 500) { 'high' } else { 'medium' }) `
             -Title "$($ws['Name']): $([Math]::Round($dailyGb,0)) GB/day on pay-as-you-go - commitment tier available" `
+            -CheckId 'cost.standalone-commitment-tier' `
             -Detail ('This workspace has no consolidation peers in its region/environment, so it would not ' +
                 'otherwise be flagged for a pricing-tier change. At its current volume, a commitment tier reduces ' +
                 "list price from $(Format-AzMonUsd $paygMo)/mo (PAYG) to $(Format-AzMonUsd $best.MonthlyCost)/mo.") `
@@ -236,8 +245,10 @@ function Find-AzMonCostOptimizationFinding {
         $sev = switch ($impact) { 'High' { 'high' } 'Medium' { 'medium' } default { 'low' } }
         $benefitSuffix = if ($rec['PotentialBenefit']) { " Potential benefit: $($rec['PotentialBenefit'])" } else { '' }
         $recommendation = if ($rec['LearnMoreLink']) { "See $($rec['LearnMoreLink'])" } else { 'Review this recommendation in Azure Advisor.' }
+        $checkSlug = ([string]$rec['Problem'] -replace '[^a-zA-Z0-9]+', '-').Trim('-').ToLowerInvariant()
         $findings.Add((New-AzMonFinding -Category 'cost' -Severity $sev `
             -Title "Azure Advisor: $($rec['Problem'])" `
+            -CheckId "cost.advisor.$checkSlug" `
             -Detail "$($rec['Solution'])$benefitSuffix" `
             -ResourceIds @($rec['ResourceId']) `
             -Recommendation $recommendation `

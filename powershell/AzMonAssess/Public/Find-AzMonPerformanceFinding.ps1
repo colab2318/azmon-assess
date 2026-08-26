@@ -24,6 +24,7 @@ function Find-AzMonPerformanceFinding {
         if ($ai['Location'] -and $ws['Location'] -and (([string]$ai['Location']).ToLowerInvariant() -ne ([string]$ws['Location']).ToLowerInvariant())) {
             $findings.Add((New-AzMonFinding -Category 'performance' -Severity 'medium' `
                 -Title "App Insights '$($ai['Name'])' region '$($ai['Location'])' differs from workspace region '$($ws['Location'])'" `
+                -CheckId 'performance.region-mismatch' `
                 -Detail ('Cross-region telemetry adds ingest latency (P95 typically +100-300 ms), cross-region ' +
                     'egress cost, and creates a second regional failure domain for the same telemetry pipeline.') `
                 -ResourceIds @($ai['Id'], $ws['Id']) `
@@ -40,6 +41,7 @@ function Find-AzMonPerformanceFinding {
         if ($gb30 -ge $script:AzMonDedicatedClusterThresholdGb30d -and -not $ws['ClusterResourceId']) {
             $findings.Add((New-AzMonFinding -Category 'performance' -Severity 'high' `
                 -Title "$($ws['Name']): $([Math]::Round($gb30,0)) GB/30d - candidate for dedicated cluster tier" `
+                -CheckId 'performance.dedicated-cluster-candidate' `
                 -Detail ('Workspaces above ~500 GB/day benefit from a dedicated cluster: guaranteed query ' +
                     'capacity, customer-managed keys (CMK), cross-workspace cost pooling, and up to ~25% ' +
                     'commit-tier discount.') `
@@ -66,6 +68,7 @@ function Find-AzMonPerformanceFinding {
         if ($candidates.Count -eq 0) { continue }
         $findings.Add((New-AzMonFinding -Category 'performance' -Severity 'medium' `
             -Title "$($ws['Name']): $($candidates.Count) high-volume tables with >30d retention - consider Search Jobs / Basic tier + long-term archive" `
+            -CheckId 'performance.search-jobs-candidate' `
             -Detail ('Keeping these tables at Analytics-tier retention is expensive and slows interactive ' +
                 'queries. Search Jobs let you run one-shot investigations against months of cold data at ~5% of ' +
                 'the ingestion cost, while Basic tier avoids the cross-query cost hit.') `

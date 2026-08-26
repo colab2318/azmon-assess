@@ -89,6 +89,7 @@ function Find-AzMonCoverageGapFinding {
     if ($missingDiag.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'coverage' -Severity 'high' `
             -Title "$($missingDiag.Count) critical resources have no diagnostic settings" `
+            -CheckId 'coverage.missing-diagnostic-settings' `
             -Detail ('These resource types should always route platform logs to a Log Analytics workspace for ' +
                 'security detection and operational alerting. Without diagnostic settings, you cannot alert on ' +
                 'failures or investigate incidents.') `
@@ -102,6 +103,7 @@ function Find-AzMonCoverageGapFinding {
     if ($notToWs.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'coverage' -Severity 'medium' `
             -Title "$($notToWs.Count) resources have diagnostic settings but no Logs category reaching a Log Analytics workspace" `
+            -CheckId 'coverage.diagnostic-not-to-workspace' `
             -Detail ('Storage-account-only or event-hub-only routing prevents correlation and alerting inside ' +
                 'Azure Monitor. A setting can also have a workspace destination configured with only Metrics ' +
                 'categories enabled, sending zero log data despite appearing to have a workspace destination. ' +
@@ -115,6 +117,7 @@ function Find-AzMonCoverageGapFinding {
     if ($webWithoutAi.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'coverage' -Severity 'medium' `
             -Title "$($webWithoutAi.Count) web apps / container apps have no obvious Application Insights component" `
+            -CheckId 'coverage.web-without-app-insights' `
             -Detail ('Web workloads should adopt workspace-based Application Insights + OpenTelemetry ' +
                 'auto-instrumentation to enable end-to-end distributed tracing, request-rate / latency / error ' +
                 'metrics, and live metrics.') `
@@ -130,6 +133,7 @@ function Find-AzMonCoverageGapFinding {
     if ($vmNoHeartbeat.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'coverage' -Severity 'high' `
             -Title "$($vmNoHeartbeat.Count) VMs have no Heartbeat in the last 2 days" `
+            -CheckId 'coverage.vm-no-heartbeat' `
             -Detail ('No monitoring agent (Azure Monitor Agent / legacy MMA) is reporting Heartbeat for these VMs ' +
                 'in any connected workspace. They are effectively invisible to alerting, Update Management, and ' +
                 'VM insights.') `
@@ -144,6 +148,7 @@ function Find-AzMonCoverageGapFinding {
     if ($classicAi.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'coverage' -Severity 'high' `
             -Title "$($classicAi.Count) classic Application Insights components (not workspace-based)" `
+            -CheckId 'coverage.classic-app-insights' `
             -Detail ('Classic App Insights is deprecated (retired Feb 2024). It cannot be used with commitment ' +
                 'tiers, unified alerting, or cross-workspace queries.') `
             -ResourceIds @($classicAi | ForEach-Object { $_['Id'] }) `
@@ -161,6 +166,7 @@ function Find-AzMonCoverageGapFinding {
         if ($orphanedDcrs.Count -gt 0) {
             $findings.Add((New-AzMonFinding -Category 'coverage' -Severity 'low' `
                 -Title "$($orphanedDcrs.Count) Data Collection Rules have zero resource associations" `
+                -CheckId 'coverage.orphaned-dcr' `
                 -Detail ('These DCRs are not attached to any VM, AMA extension, or other data source, so they ' +
                     'collect nothing. Common leftovers from decommissioned VMs or AMA migration cleanups.') `
                 -ResourceIds @($orphanedDcrs | ForEach-Object { $_['Id'] }) `

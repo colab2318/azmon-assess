@@ -22,6 +22,7 @@ function Find-AzMonTracingFinding {
         $byType = Get-AzMonCountByType -ResourceRef $candidates
         $findings.Add((New-AzMonFinding -Category 'tracing' -Severity 'high' `
             -Title 'Low distributed-tracing coverage across web / integration workloads' `
+            -CheckId 'tracing.low-coverage' `
             -Detail ('Only a fraction of candidate workloads are instrumented for distributed tracing. Adopting ' +
                 "Azure Monitor's OpenTelemetry Distro provides vendor-neutral traces from front-end through APIM " +
                 '-> Container Apps -> Service Bus -> DB, and lets Application Insights correlate requests ' +
