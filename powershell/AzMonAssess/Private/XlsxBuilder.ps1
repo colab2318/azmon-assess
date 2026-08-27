@@ -256,12 +256,12 @@ function Set-AzMonXlsxFreezeHeader {
 
 function Set-AzMonXlsxAutoFilter {
     [CmdletBinding()]
-    param([Parameter(Mandatory)] [hashtable] $Sheet, [int] $RowCount, [int] $ColumnCount)
+    param([Parameter(Mandatory)] [hashtable] $Sheet, [int] $StartRow = 1, [int] $RowCount, [int] $ColumnCount)
     if (-not $RowCount) { $RowCount = $Sheet.Rows.Count }
     if (-not $ColumnCount) { $ColumnCount = $Sheet.MaxColumnCount }
     if ($RowCount -le 0 -or $ColumnCount -le 0) { return }
     $lastCol = ConvertTo-AzMonXlsxColumnLetter $ColumnCount
-    $Sheet.AutoFilterRange = "A1:$lastCol$RowCount"
+    $Sheet.AutoFilterRange = "A${StartRow}:$lastCol$RowCount"
 }
 
 function Merge-AzMonXlsxCells {

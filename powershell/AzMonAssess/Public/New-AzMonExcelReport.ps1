@@ -26,6 +26,7 @@ function New-AzMonExcelReport {
     Add-AzMonExcelFindingsSheet -Workbook $wb -Snapshot $Snapshot
     Add-AzMonExcelImpactedResourcesSheet -Workbook $wb -Snapshot $Snapshot -Lookup $lookup
     Add-AzMonExcelCompliantResourcesSheet -Workbook $wb -Snapshot $Snapshot -Lookup $lookup
+    Add-AzMonExcelActionPlanSheet -Workbook $wb -Snapshot $Snapshot
     Add-AzMonExcelWorkspacesSheet -Workbook $wb -Snapshot $Snapshot
     Add-AzMonExcelAppInsightsSheet -Workbook $wb -Snapshot $Snapshot
     Add-AzMonExcelAlertsSheet -Workbook $wb -Snapshot $Snapshot
@@ -64,6 +65,76 @@ function Get-AzMonWafPillar {
         'performance' { 'Performance Efficiency' }
         default { 'Operational Excellence' }
     }
+}
+
+# ---- Action Plan: observability findings ranked by cost-effectiveness ----
+# 'Free' = configuration-only fix on an already-provisioned resource (no
+# new Azure spend). 'Low-Cost' = a small new recurring cost (a new AI
+# resource, an extra diagnostic-setting destination, agent ingestion).
+# 'Investment' = a meaningful new spend or migration effort (region move,
+# org-wide SDK rollout). Unlisted CheckIds default to 'Review Required'
+# so a future new check is never silently mis-costed.
+$script:AzMonObservabilityEffortByCheckId = @{
+    'coverage.missing-diagnostic-settings'   = 'Free'
+    'coverage.diagnostic-not-to-workspace'   = 'Free'
+    'coverage.classic-app-insights'          = 'Free'
+    'coverage.orphaned-dcr'                  = 'Free'
+    'coverage.web-without-app-insights'      = 'Low-Cost'
+    'coverage.vm-no-heartbeat'               = 'Low-Cost'
+    'alerting.disabled-rules'                = 'Free'
+    'alerting.silent-rules'                  = 'Free'
+    'alerting.orphaned-action-groups'        = 'Free'
+    'alerting.missing-severity'              = 'Free'
+    'alerting.noisy-rules'                   = 'Free'
+    'alerting.broad-scope-metric-alerts'     = 'Free'
+    'alerting.high-frequency-log-alerts'     = 'Free'
+    'alerting.static-threshold-only'         = 'Free'
+    'alerting.missing-baseline-alerts'       = 'Low-Cost'
+    'reliability.workspace-no-health-alert'  = 'Free'
+    'reliability.service-health-alert-missing' = 'Free'
+    'reliability.single-log-destination'     = 'Low-Cost'
+    'reliability.workspace-non-az-region'    = 'Investment'
+    'reliability.ai-non-az-region'           = 'Investment'
+    'tracing.low-coverage'                   = 'Investment'
+}
+$script:AzMonObservabilityCategories = @('coverage', 'alerting', 'tracing', 'reliability')
+$script:AzMonActionPlanPhase = @{
+    'Free'            = @{ Order = 0; Label = 'Phase 1 - Free quick wins (this sprint)' }
+    'Low-Cost'        = @{ Order = 1; Label = 'Phase 2 - Low-cost (30-60 days)' }
+    'Investment'      = @{ Order = 2; Label = 'Phase 3 - Investment required (60-90 days)' }
+    'Review Required' = @{ Order = 3; Label = 'Needs cost review' }
+}
+
+function Get-AzMonActionPlanItem {
+    <#
+    .SYNOPSIS
+        Findings from the core observability categories (coverage,
+        alerting, tracing, reliability), ranked into cost-effort phases so
+        the free/no-new-spend fixes surface first. Shared logic so any
+        report format can render the same plan consistently.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [hashtable] $Snapshot)
+
+    $findings = @($Snapshot['Findings'] | Where-Object { $script:AzMonObservabilityCategories -contains $_['Category'] })
+    $items = foreach ($f in $findings) {
+        $effort = $script:AzMonObservabilityEffortByCheckId[$f['CheckId'] ?? '']
+        if (-not $effort) { $effort = 'Review Required' }
+        [pscustomobject]@{
+            Phase          = $script:AzMonActionPlanPhase[$effort].Label
+            PhaseOrder     = $script:AzMonActionPlanPhase[$effort].Order
+            Effort         = $effort
+            Severity       = $f['Severity']
+            SeverityRank   = Get-AzMonSeverityRank $f['Severity']
+            Category       = Get-AzMonCategoryLabel $f['Category']
+            Title          = $f['Title']
+            Recommendation = $f['Recommendation']
+            ResourceCount  = [Math]::Max(1, @($f['ResourceIds'] | Where-Object { $_ }).Count)
+            LearnMoreLink  = $f['LearnMoreLink']
+            CheckId        = $f['CheckId']
+        }
+    }
+    return @($items | Sort-Object -Property PhaseOrder, SeverityRank)
 }
 
 # ---- sheet builders ------------------------------------------------------
@@ -256,6 +327,50 @@ function Add-AzMonExcelCompliantResourcesSheet {
     Set-AzMonXlsxColumnWidths -Sheet $ws -Width @(14, 20, 40, 55, 26, 36, 20, 14, 26, 60)
     Set-AzMonXlsxFreezeHeader -Sheet $ws
     Set-AzMonXlsxAutoFilter -Sheet $ws
+}
+
+function Add-AzMonExcelActionPlanSheet {
+    <#
+    .SYNOPSIS
+        A cost-effectiveness-ranked roadmap for closing observability gaps
+        (coverage, alerting, tracing, reliability): free/config-only fixes
+        first, then low-cost, then items that need real investment. Cost
+        Optimization findings elsewhere in the assessment are surfaced as
+        a funding note, since realized savings there can fund Phase 2/3.
+    #>
+    param([hashtable] $Workbook, [hashtable] $Snapshot)
+
+    $items = Get-AzMonActionPlanItem -Snapshot $Snapshot
+    $totalSavings = (@($Snapshot['Findings'] | Where-Object { $_['Category'] -eq 'cost' } | ForEach-Object { [double]($_['EstimatedMonthlySavingsUsd'] ?? 0) }) | Measure-Object -Sum).Sum
+
+    $ws = Add-AzMonXlsxSheet -Workbook $Workbook -Name 'Action Plan'
+    Add-AzMonXlsxRow -Sheet $ws -Cell @('Observability improvement plan, ranked by cost-effectiveness (free fixes first)') | Out-Null
+    if ($totalSavings -gt 0) {
+        Add-AzMonXlsxRow -Sheet $ws -Cell @("Funding note: $(Format-AzMonUsd $totalSavings)/mo identified in Cost Optimization findings could fund Phase 2/3 items below.") | Out-Null
+    }
+    Add-AzMonXlsxRow -Sheet $ws -Cell @('') | Out-Null
+
+    $header = @('Phase', 'Effort', 'Severity', 'Category', 'Finding', 'Recommendation', 'Resources Affected', 'Learn More Link', 'checkName')
+    $headerRowNum = Add-AzMonXlsxHeaderRow -Sheet $ws -Header $header
+
+    if ($items.Count -eq 0) {
+        Add-AzMonXlsxRow -Sheet $ws -Cell (@('No observability findings') + (1..8 | ForEach-Object { '' })) | Out-Null
+    }
+    foreach ($item in $items) {
+        $cells = @(
+            $item.Phase, $item.Effort, $item.Severity, $item.Category, $item.Title, $item.Recommendation,
+            $item.ResourceCount, ($item.LearnMoreLink ?? ''), $item.CheckId
+        )
+        $rowNum = Add-AzMonXlsxRow -Sheet $ws -Cell $cells
+        Set-AzMonXlsxCellWrap -Sheet $ws -Row $rowNum -Column 5
+        Set-AzMonXlsxCellWrap -Sheet $ws -Row $rowNum -Column 6
+        $sevFill = $script:AzMonSevFillHex[$item.Severity ?? '']
+        if ($sevFill) { $ws.Rows[$rowNum - 1].Cells[2].FillHex = $sevFill }
+        if ($item.LearnMoreLink) { Set-AzMonXlsxHyperlink -Sheet $ws -Row $rowNum -Column 8 -Url $item.LearnMoreLink -Text 'Learn more' }
+    }
+    Set-AzMonXlsxColumnWidths -Sheet $ws -Width @(34, 12, 12, 20, 55, 60, 18, 24, 36)
+    Set-AzMonXlsxFreezeHeader -Sheet $ws -Rows $headerRowNum
+    Set-AzMonXlsxAutoFilter -Sheet $ws -StartRow $headerRowNum
 }
 
 function Add-AzMonExcelWorkspacesSheet {
