@@ -6,10 +6,15 @@
 # ever builds a workbook from scratch); this module never regenerates a
 # sheet, it only rewrites the text of specific already-existing cells.
 #
-# Safe by construction because New-AzMonExcelReport.ps1 writes every
-# string cell as an inline string (t="inlineStr", see XlsxBuilder.ps1) —
-# there is no shared-strings table, so changing one cell's <t> text can
-# never change the text shown in any other cell.
+# New-AzMonExcelReport.ps1 writes every string cell as an inline string
+# (t="inlineStr", see XlsxBuilder.ps1). But once a human opens the file in
+# real Excel and saves it - the whole point of the finalize workflow's
+# manual review step - Excel rewrites every string cell to ITS preferred
+# shared-strings format (t="s", an index into xl/sharedStrings.xml)
+# regardless of how the file looked when opened. Every read below handles
+# BOTH encodings; writes always rewrite the touched cell back to a fresh
+# inline string so later reads never depend on a possibly-stale
+# sharedStrings.xml.
 
 function Read-AzMonZipEntryText {
     [CmdletBinding()]
@@ -21,6 +26,80 @@ function Read-AzMonZipEntryText {
     } finally {
         $stream.Dispose()
     }
+}
+
+function Get-AzMonXlsxSharedStrings {
+    <#
+    .SYNOPSIS
+        Loads xl/sharedStrings.xml (if the package has one) into an
+        ordered array of plain text, indexed the same way a t="s" cell's
+        <v> value references it. Returns an empty array for a workbook
+        with no shared-strings part (e.g. a freshly-generated report.xlsx,
+        which uses only inline strings until a human opens/saves it).
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $Zip)
+
+    $entry = $Zip.GetEntry('xl/sharedStrings.xml')
+    if (-not $entry) { return @() }
+    [xml]$xml = Read-AzMonZipEntryText -Entry $entry
+    $siNodes = $xml.SelectNodes("//*[local-name()='sst']/*[local-name()='si']")
+    return @(foreach ($si in $siNodes) {
+            ($si.SelectNodes(".//*[local-name()='t']") | ForEach-Object { $_.InnerText }) -join ''
+        })
+}
+
+function Get-AzMonXlsxCellText {
+    <#
+    .SYNOPSIS
+        Reads a cell's text regardless of whether it's stored as an
+        inline string (t="inlineStr", written by this tool), a shared
+        string (t="s", the format Excel converts cells to on save - looks
+        up SharedStrings by index), a formula string result (t="str"), or
+        a bare value.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $Cell, [string[]] $SharedStrings = @())
+
+    $type = $Cell.GetAttribute('t')
+    if ($type -eq 'inlineStr') {
+        $isNode = $Cell.SelectSingleNode("*[local-name()='is']")
+        if (-not $isNode) { return $null }
+        return (($isNode.SelectNodes(".//*[local-name()='t']") | ForEach-Object { $_.InnerText }) -join '')
+    }
+    if ($type -eq 's') {
+        $vNode = $Cell.SelectSingleNode("*[local-name()='v']")
+        if (-not $vNode) { return $null }
+        $idx = 0
+        if (-not [int]::TryParse($vNode.InnerText, [ref] $idx)) { return $null }
+        if ($idx -lt 0 -or $idx -ge $SharedStrings.Count) { return $null }
+        return $SharedStrings[$idx]
+    }
+    $vNode = $Cell.SelectSingleNode("*[local-name()='v']")
+    if ($vNode) { return $vNode.InnerText }
+    return $null
+}
+
+function Set-AzMonXlsxCellInlineText {
+    <#
+    .SYNOPSIS
+        Rewrites a cell to a fresh inline string (t="inlineStr"),
+        replacing whatever it held before (shared string, formula result,
+        number, or an existing inline string) - so the cell keeps reading
+        correctly via Get-AzMonXlsxCellText no matter how many times Excel
+        has round-tripped the file since. Leaves every other attribute on
+        the cell (r, s/style index, ...) untouched.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $Cell, [Parameter(Mandatory)] [string] $Text)
+
+    while ($Cell.HasChildNodes) { [void]$Cell.RemoveChild($Cell.FirstChild) }
+    $Cell.SetAttribute('t', 'inlineStr')
+    $isEl = $Cell.OwnerDocument.CreateElement('is', $Cell.NamespaceURI)
+    $tEl = $Cell.OwnerDocument.CreateElement('t', $Cell.NamespaceURI)
+    $tEl.InnerText = $Text
+    [void]$isEl.AppendChild($tEl)
+    [void]$Cell.AppendChild($isEl)
 }
 
 function Resolve-AzMonXlsxSheetPartPath {
@@ -57,15 +136,15 @@ function Get-AzMonXlsxHeaderColumnMap {
         row, so callers locate columns by name instead of a hardcoded index.
     #>
     [CmdletBinding()]
-    param([Parameter(Mandatory)] $SheetXml)
+    param([Parameter(Mandatory)] $SheetXml, [string[]] $SharedStrings = @())
 
     $headerRow = $SheetXml.SelectSingleNode("//*[local-name()='sheetData']/*[local-name()='row'][1]")
     $map = @{}
     if (-not $headerRow) { return $map }
     foreach ($cell in $headerRow.SelectNodes("*[local-name()='c']")) {
         $colLetter = ($cell.GetAttribute('r') -replace '\d+$', '')
-        $t = $cell.SelectSingleNode("*[local-name()='is']/*[local-name()='t']")
-        if ($t) { $map[$colLetter] = $t.InnerText }
+        $text = Get-AzMonXlsxCellText -Cell $cell -SharedStrings $SharedStrings
+        if ($text) { $map[$colLetter] = $text }
     }
     return $map
 }
@@ -99,7 +178,8 @@ function Get-AzMonExcelReviewStatus {
             $sheetEntry = $zip.GetEntry($partPath)
             if (-not $sheetEntry) { throw "Worksheet part '$partPath' not found." }
             [xml]$sheetXml = Read-AzMonZipEntryText -Entry $sheetEntry
-            $colMap = Get-AzMonXlsxHeaderColumnMap -SheetXml $sheetXml
+            $sharedStrings = Get-AzMonXlsxSharedStrings -Zip $zip
+            $colMap = Get-AzMonXlsxHeaderColumnMap -SheetXml $sheetXml -SharedStrings $sharedStrings
             $keyCol = ($colMap.Keys | Where-Object { $colMap[$_] -eq $KeyColumnHeader } | Select-Object -First 1)
             $resourceCol = ($colMap.Keys | Where-Object { $colMap[$_] -eq $ResourceColumnHeader } | Select-Object -First 1)
             $statusCol = ($colMap.Keys | Where-Object { $colMap[$_] -eq $StatusColumnHeader } | Select-Object -First 1)
@@ -112,18 +192,15 @@ function Get-AzMonExcelReviewStatus {
                     $cells[($cell.GetAttribute('r') -replace '\d+$', '')] = $cell
                 }
                 if (-not $cells.ContainsKey($keyCol)) { continue }
-                $findingIdNode = $cells[$keyCol].SelectSingleNode("*[local-name()='is']/*[local-name()='t']")
-                if (-not $findingIdNode -or -not $findingIdNode.InnerText) { continue }
-                $findingId = $findingIdNode.InnerText
+                $findingId = Get-AzMonXlsxCellText -Cell $cells[$keyCol] -SharedStrings $sharedStrings
+                if (-not $findingId) { continue }
                 $resourceId = ''
                 if ($resourceCol -and $cells.ContainsKey($resourceCol)) {
-                    $rNode = $cells[$resourceCol].SelectSingleNode("*[local-name()='is']/*[local-name()='t']")
-                    if ($rNode) { $resourceId = $rNode.InnerText }
+                    $resourceId = Get-AzMonXlsxCellText -Cell $cells[$resourceCol] -SharedStrings $sharedStrings
                 }
                 $statusText = ''
                 if ($cells.ContainsKey($statusCol)) {
-                    $sNode = $cells[$statusCol].SelectSingleNode("*[local-name()='is']/*[local-name()='t']")
-                    if ($sNode) { $statusText = $sNode.InnerText }
+                    $statusText = Get-AzMonXlsxCellText -Cell $cells[$statusCol] -SharedStrings $sharedStrings
                 }
                 $result["$findingId|$(([string]$resourceId).ToLowerInvariant())"] = $statusText
             }
@@ -178,7 +255,8 @@ function Update-AzMonExcelReviewStatus {
             $sheetEntry = $zip.GetEntry($partPath)
             if (-not $sheetEntry) { throw "Worksheet part '$partPath' not found." }
             [xml]$sheetXml = Read-AzMonZipEntryText -Entry $sheetEntry
-            $colMap = Get-AzMonXlsxHeaderColumnMap -SheetXml $sheetXml
+            $sharedStrings = Get-AzMonXlsxSharedStrings -Zip $zip
+            $colMap = Get-AzMonXlsxHeaderColumnMap -SheetXml $sheetXml -SharedStrings $sharedStrings
             $keyCol = ($colMap.Keys | Where-Object { $colMap[$_] -eq $KeyColumnHeader } | Select-Object -First 1)
             $resourceCol = ($colMap.Keys | Where-Object { $colMap[$_] -eq $ResourceColumnHeader } | Select-Object -First 1)
             $statusCol = ($colMap.Keys | Where-Object { $colMap[$_] -eq $StatusColumnHeader } | Select-Object -First 1)
@@ -191,24 +269,21 @@ function Update-AzMonExcelReviewStatus {
                     $cells[($cell.GetAttribute('r') -replace '\d+$', '')] = $cell
                 }
                 if (-not $cells.ContainsKey($keyCol)) { continue }
-                $findingIdNode = $cells[$keyCol].SelectSingleNode("*[local-name()='is']/*[local-name()='t']")
-                if (-not $findingIdNode -or -not $findingIdNode.InnerText) { continue }
-                $findingId = $findingIdNode.InnerText
+                $findingId = Get-AzMonXlsxCellText -Cell $cells[$keyCol] -SharedStrings $sharedStrings
+                if (-not $findingId) { continue }
                 $resourceId = ''
                 if ($resourceCol -and $cells.ContainsKey($resourceCol)) {
-                    $rNode = $cells[$resourceCol].SelectSingleNode("*[local-name()='is']/*[local-name()='t']")
-                    if ($rNode) { $resourceId = $rNode.InnerText }
+                    $resourceId = Get-AzMonXlsxCellText -Cell $cells[$resourceCol] -SharedStrings $sharedStrings
                 }
                 $key = "$findingId|$(([string]$resourceId).ToLowerInvariant())"
                 if (-not $updateByKey.ContainsKey($key)) { continue }
 
                 if (-not $cells.ContainsKey($statusCol)) { continue }
-                $tNode = $cells[$statusCol].SelectSingleNode("*[local-name()='is']/*[local-name()='t']")
-                if (-not $tNode) { continue }
+                $cellNode = $cells[$statusCol]
+                $oldStatus = Get-AzMonXlsxCellText -Cell $cellNode -SharedStrings $sharedStrings
                 $newStatus = $updateByKey[$key].NewStatus
-                $oldStatus = $tNode.InnerText
                 if ($oldStatus -eq $newStatus) { continue }
-                $tNode.InnerText = $newStatus
+                Set-AzMonXlsxCellInlineText -Cell $cellNode -Text $newStatus
                 $applied.Add(@{ FindingId = $findingId; ResourceId = $resourceId; PreviousStatus = $oldStatus; NewStatus = $newStatus })
             }
 
