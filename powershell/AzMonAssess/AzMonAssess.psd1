@@ -43,6 +43,7 @@
         'Invoke-AzMonTriage'
         'Invoke-AzMonRemediation'
         'Invoke-AzMonVerification'
+        'Invoke-AzMonFinalReport'
     )
     CmdletsToExport      = @()
     VariablesToExport    = @()

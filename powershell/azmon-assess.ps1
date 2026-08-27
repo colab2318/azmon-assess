@@ -32,12 +32,16 @@
     ./azmon-assess.ps1 verify -Snapshot ./out/snapshot.json -Live
     Re-check every finding against the current Azure environment and mark
     resolved ones "Reviewed - Implemented" directly in report.xlsx.
+.EXAMPLE
+    ./azmon-assess.ps1 finalize -Snapshot ./out/snapshot.json -ReviewedReportPath ./out/report_updated.xlsx -Output ./out
+    Build report-final.html/.pptx containing only the findings/resources a
+    reviewer manually marked "Reviewed - Not Implemented" in a copy of report.xlsx.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory, Position = 0)]
     [ValidateSet('run', 'consolidate', 'gaps', 'alerts', 'cost', 'tracing', 'reliability', 'security', 'performance',
-        'demo', 'report', 'summarize', 'triage', 'remediate', 'verify')]
+        'demo', 'report', 'summarize', 'triage', 'remediate', 'verify', 'finalize')]
     [string] $Command,
 
     [Alias('o')] [string] $Output = './out',
@@ -73,7 +77,8 @@ param(
     [string] $ReportPath,
     [string] $CurrentSnapshot,
     [switch] $Live,
-    [switch] $Detail
+    [switch] $Detail,
+    [string] $ReviewedReportPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -150,5 +155,12 @@ switch ($Command) {
         Invoke-AzMonVerification -SnapshotPath $Snapshot -ReportPath $ReportPath -OutputPath $Output `
             -CurrentSnapshotPath $CurrentSnapshot -Live:$Live -SubscriptionId $SubscriptionId -ManagementGroupId $ManagementGroupId `
             -LookbackDays $LookbackDays -ThrottleLimit $ThrottleLimit -Detail:$Detail | Out-Null
+    }
+
+    'finalize' {
+        if (-not $Snapshot) { throw '-Snapshot is required for the finalize command.' }
+        $reviewedPath = if ($ReviewedReportPath) { $ReviewedReportPath } else { Join-Path (Split-Path -Parent (Resolve-Path -LiteralPath $Snapshot).Path) 'report_updated.xlsx' }
+        $finalFormat = if ($PSBoundParameters.ContainsKey('Format')) { $Format } else { @('html', 'pptx') }
+        Invoke-AzMonFinalReport -SnapshotPath $Snapshot -ReviewedReportPath $reviewedPath -OutputPath $Output -Report $finalFormat | Out-Null
     }
 }

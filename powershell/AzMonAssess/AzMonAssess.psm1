@@ -50,4 +50,5 @@ Export-ModuleMember -Function @(
     'Invoke-AzMonTriage'
     'Invoke-AzMonRemediation'
     'Invoke-AzMonVerification'
+    'Invoke-AzMonFinalReport'
 )

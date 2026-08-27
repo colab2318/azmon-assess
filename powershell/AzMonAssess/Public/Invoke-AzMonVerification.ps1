@@ -8,10 +8,11 @@
 # raise it fresh - single source of truth for "what counts as a problem".
 
 $script:AzMonReviewStatus = @{
-    NotReviewed  = 'Not Reviewed'
-    Implemented  = 'Reviewed - Implemented'
-    ManualReview = 'Needs Manual Review'
-    Regressed    = 'Regression - Reopened'
+    NotReviewed    = 'Not Reviewed'
+    Implemented    = 'Reviewed - Implemented'
+    NotImplemented = 'Reviewed - Not Implemented'
+    ManualReview   = 'Needs Manual Review'
+    Regressed      = 'Regression - Reopened'
 }
 
 function Test-AzMonResourceStillExists {
