@@ -11,7 +11,22 @@ $script:AzMonCriticalDiagnosticTypes = @(
     'microsoft.network/vpngateways', 'microsoft.network/virtualnetworkgateways', 'microsoft.network/expressroutecircuits',
     'microsoft.recoveryservices/vaults', 'microsoft.automation/automationaccounts', 'microsoft.logic/workflows',
     'microsoft.datafactory/factories', 'microsoft.network/bastionhosts', 'microsoft.cognitiveservices/accounts',
-    'microsoft.cdn/profiles'
+    'microsoft.cdn/profiles', 'microsoft.eventgrid/topics', 'microsoft.eventgrid/domains', 'microsoft.eventgrid/systemtopics',
+    'microsoft.kusto/clusters', 'microsoft.synapse/workspaces', 'microsoft.databricks/workspaces',
+    'microsoft.containerinstance/containergroups', 'microsoft.signalrservice/signalr', 'microsoft.signalrservice/webpubsub',
+    'microsoft.appconfiguration/configurationstores', 'microsoft.search/searchservices', 'microsoft.dashboard/grafana',
+    'microsoft.batch/batchaccounts', 'microsoft.notificationhubs/namespaces'
+    # NOTE: microsoft.web/staticsites, microsoft.network/natgateways,
+    # microsoft.network/trafficmanagerprofiles, microsoft.network/dnszones,
+    # microsoft.network/privatednszones, and microsoft.servicefabric/clusters
+    # are deliberately NOT in this list - confirmed against the official ARM
+    # resource log reference (learn.microsoft.com/azure/azure-monitor/reference/logs-index)
+    # that they either don't support diagnostic settings log categories at
+    # all (Service Fabric isn't listed there), or support is unclear/metrics
+    # -only - flagging them here would risk the same false-positive class of
+    # bug just fixed for Get-AzMonDiagnosticSetting. They're still collected
+    # in the general monitorable-resource inventory (ArgQueries.ps1), just
+    # excluded from this specific "missing diagnostic settings" check.
 )
 $script:AzMonWebTypes = @('microsoft.web/sites', 'microsoft.app/containerapps')
 

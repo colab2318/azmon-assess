@@ -120,7 +120,27 @@ resources
     'microsoft.datafactory/factories',
     'microsoft.network/bastionhosts',
     'microsoft.cognitiveservices/accounts',
-    'microsoft.cdn/profiles'
+    'microsoft.cdn/profiles',
+    'microsoft.eventgrid/topics',
+    'microsoft.eventgrid/domains',
+    'microsoft.eventgrid/systemtopics',
+    'microsoft.kusto/clusters',
+    'microsoft.synapse/workspaces',
+    'microsoft.databricks/workspaces',
+    'microsoft.containerinstance/containergroups',
+    'microsoft.signalrservice/signalr',
+    'microsoft.signalrservice/webpubsub',
+    'microsoft.appconfiguration/configurationstores',
+    'microsoft.search/searchservices',
+    'microsoft.dashboard/grafana',
+    'microsoft.web/staticsites',
+    'microsoft.batch/batchaccounts',
+    'microsoft.servicefabric/clusters',
+    'microsoft.network/natgateways',
+    'microsoft.network/trafficmanagerprofiles',
+    'microsoft.notificationhubs/namespaces',
+    'microsoft.network/dnszones',
+    'microsoft.network/privatednszones'
   )
 | project id, name, type, subscriptionId, resourceGroup, location, tags
 '@
