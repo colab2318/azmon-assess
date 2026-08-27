@@ -32,12 +32,18 @@ function New-AzMonPptxReport {
     Add-AzMonPptxEnvironmentSlide -Deck $deck -Snapshot $Snapshot
     Add-AzMonPptxSeveritySlide -Deck $deck -Snapshot $Snapshot
     Add-AzMonPptxCategorySlide -Deck $deck -Snapshot $Snapshot
+    Add-AzMonPptxWhatsGoingWellSlide -Deck $deck -Snapshot $Snapshot
     Add-AzMonPptxTopFindingsSlide -Deck $deck -Snapshot $Snapshot
+    Add-AzMonPptxImpactRecommendationsSlide -Deck $deck -Snapshot $Snapshot -Tier 'High' -Severity @('critical', 'high') -ColorHex $script:AzMonPptxCritical
+    Add-AzMonPptxImpactRecommendationsSlide -Deck $deck -Snapshot $Snapshot -Tier 'Medium' -Severity @('medium') -ColorHex $script:AzMonPptxHigh
+    Add-AzMonPptxImpactRecommendationsSlide -Deck $deck -Snapshot $Snapshot -Tier 'Low' -Severity @('low', 'info') -ColorHex $script:AzMonPptxLow
+    Add-AzMonPptxServiceHealthSlide -Deck $deck -Snapshot $Snapshot
     Add-AzMonPptxImpactedResourcesSlide -Deck $deck -Snapshot $Snapshot
     Add-AzMonPptxSavingsSlide -Deck $deck -Snapshot $Snapshot
     Add-AzMonPptxConsolidationSlide -Deck $deck -Snapshot $Snapshot
     Add-AzMonPptxTracingSlide -Deck $deck -Snapshot $Snapshot
     Add-AzMonPptxRoadmapSlide -Deck $deck -Snapshot $Snapshot
+    Add-AzMonPptxResourcesSlide -Deck $deck -Snapshot $Snapshot
     Add-AzMonPptxNextStepsSlide -Deck $deck -Snapshot $Snapshot
 
     Save-AzMonPptxDeck -Deck $deck -Path $Path -Title "Azure Monitoring Assessment — $($Snapshot['CustomerName'])"
@@ -128,6 +134,123 @@ function Add-AzMonPptxCategorySlide {
     for ($i = 0; $i -lt $keys.Count; $i++) { $colors += $palette[$i % $palette.Count] }
 
     Add-AzMonPptxShareBar -Slide $slide -Category $keys -Value @($keys | ForEach-Object { [double]$cats[$_] }) -ColorHex $colors -X 0.7 -Y 1.6 -Width 12 -BarHeight 0.9
+}
+
+function Add-AzMonPptxWhatsGoingWellSlide {
+    <#
+    .SYNOPSIS
+        Positive-findings counterpart to the severity/category slides:
+        what's already configured correctly, from ComplianceItems - the
+        same "good state" data now in the Excel Compliant Resources sheet.
+    #>
+    param($Deck, [hashtable] $Snapshot)
+    $slide = New-AzMonPptxSlide -Deck $Deck
+    Add-AzMonPptxSlideHeader -Slide $slide -Title 'What is going well' -Subtitle 'Monitoring & Observability capabilities already in place'
+
+    $items = @($Snapshot['ComplianceItems'] | Sort-Object -Property @{ Expression = { @($_['ResourceIds']).Count } } -Descending | Select-Object -First 9)
+    if ($items.Count -eq 0) {
+        Add-AzMonPptxText -Slide $slide -X 1 -Y 3 -Width 11 -Height 1 -Text 'No compliance data available for this assessment.' -Size 18 -ColorHex $script:AzMonPptxGrey
+        return
+    }
+    $bullets = @($items | ForEach-Object { ([string]$_['Title']).Substring(0, [Math]::Min(110, ([string]$_['Title']).Length)) })
+    Add-AzMonPptxBullets -Slide $slide -X 0.7 -Y 1.5 -Width 12 -Height 5.5 -Size 16 -Bullet $bullets
+}
+
+function Add-AzMonPptxImpactRecommendationsSlide {
+    <#
+    .SYNOPSIS
+        Full recommendations table for one impact tier (High/Medium/Low),
+        mapping azmon-assess's 5 severities into the 3-tier structure used
+        by the reference exec-summary template (High=critical+high,
+        Medium=medium, Low=low+info).
+    #>
+    param($Deck, [hashtable] $Snapshot, [string] $Tier, [string[]] $Severity, [string] $ColorHex)
+    $slide = New-AzMonPptxSlide -Deck $Deck
+    Add-AzMonPptxSlideHeader -Slide $slide -Title "$Tier impact issues - Recommendations"
+    Add-AzMonPptxRect -Slide $slide -X 0.5 -Y 1.15 -Width 2.0 -Height 0.35 -ColorHex $ColorHex
+    Add-AzMonPptxText -Slide $slide -X 0.5 -Y 1.2 -Width 2.0 -Height 0.3 -Text $Tier.ToUpperInvariant() -Size 13 -Bold -ColorHex $script:AzMonPptxWhite -Align 'ctr'
+
+    $matching = @(Sort-AzMonFinding -Finding @($Snapshot['Findings'] | Where-Object { $Severity -contains $_['Severity'] }))
+    $maxRows = 9
+    $shown = @($matching | Select-Object -First $maxRows)
+    $header = @('#', 'Recommendation', 'Category', 'Impacted Resources')
+    $colWidth = @(0.5, 7.3, 2.5, 2.0)
+    $rows = for ($i = 0; $i -lt $shown.Count; $i++) {
+        $f = $shown[$i]
+        ,@(
+            ($i + 1),
+            (([string]$f['Title']).Substring(0, [Math]::Min(95, ([string]$f['Title']).Length))),
+            (Get-AzMonCategoryLabel $f['Category']),
+            ([Math]::Max(1, @($f['ResourceIds'] | Where-Object { $_ }).Count))
+        )
+    }
+    if ($shown.Count -eq 0) {
+        Add-AzMonPptxText -Slide $slide -X 1 -Y 3 -Width 10 -Height 1 -Text "No $Tier-impact findings." -Size 18 -ColorHex $script:AzMonPptxGrey
+        return
+    }
+    Add-AzMonPptxTable -Slide $slide -X 0.5 -Y 1.65 -Header $header -ColumnWidth $colWidth -Row $rows -RowHeight 0.5 | Out-Null
+    if ($matching.Count -gt $maxRows) {
+        Add-AzMonPptxText -Slide $slide -X 0.5 -Y 7.0 -Width 12 -Height 0.35 -Text "+ $($matching.Count - $maxRows) more $Tier-impact finding(s) — see the Excel Action Plan / Impacted Resources sheets for the full list." -Size 11 -ColorHex $script:AzMonPptxGrey
+    }
+}
+
+function Add-AzMonPptxServiceHealthSlide {
+    <#
+    .SYNOPSIS
+        Per-subscription Service Health alert coverage table, combining the
+        reliability.service-health-alert-missing finding (not covered) and
+        its ComplianceItem counterpart (covered) into one Yes/No table.
+    #>
+    param($Deck, [hashtable] $Snapshot)
+    $slide = New-AzMonPptxSlide -Deck $Deck
+    Add-AzMonPptxSlideHeader -Slide $slide -Title 'Service Health Alerts for Resiliency' -Subtitle 'Coverage per subscription for Azure service outages, planned maintenance, and advisories'
+
+    $uncovered = @($Snapshot['Findings'] | Where-Object { $_['CheckId'] -eq 'reliability.service-health-alert-missing' } | ForEach-Object { $_['ResourceIds'] })
+    $covered = @($Snapshot['ComplianceItems'] | Where-Object { $_['CheckId'] -eq 'reliability.service-health-alert-missing' } | ForEach-Object { $_['ResourceIds'] })
+    $rows = [System.Collections.Generic.List[object]]::new()
+    foreach ($subId in $uncovered) { $rows.Add(@(($subId -replace '^/subscriptions/', ''), 'No')) }
+    foreach ($subId in $covered) { $rows.Add(@(($subId -replace '^/subscriptions/', ''), 'Yes')) }
+
+    if ($rows.Count -eq 0) {
+        Add-AzMonPptxText -Slide $slide -X 1 -Y 3 -Width 10 -Height 1 -Text 'No subscription data available for this check.' -Size 18 -ColorHex $script:AzMonPptxGrey
+        return
+    }
+    $header = @('Subscription Id', 'Service Health Alert Configured?')
+    $colWidth = @(8.8, 3.5)
+    $shown = @($rows | Sort-Object { $_[1] } | Select-Object -First 12)
+    Add-AzMonPptxTable -Slide $slide -X 0.5 -Y 1.7 -Header $header -ColumnWidth $colWidth -Row $shown -RowHeight 0.42 | Out-Null
+    if ($rows.Count -gt 12) {
+        Add-AzMonPptxText -Slide $slide -X 0.5 -Y 7.0 -Width 12 -Height 0.35 -Text "+ $($rows.Count - 12) more subscription(s) — see report.xlsx for the full list." -Size 11 -ColorHex $script:AzMonPptxGrey
+    }
+}
+
+function Add-AzMonPptxResourcesSlide {
+    <#
+    .SYNOPSIS
+        Q&A / further-reading slide built from the verified Learn More
+        links already attached to findings — one representative link per
+        category, so nothing here is a guessed/fabricated URL.
+    #>
+    param($Deck, [hashtable] $Snapshot)
+    $slide = New-AzMonPptxSlide -Deck $Deck
+    Add-AzMonPptxSlideHeader -Slide $slide -Title 'Q&A and Resources' -Subtitle 'Official Microsoft Learn guidance referenced by this assessment''s findings'
+
+    $byCategory = @{}
+    foreach ($f in @($Snapshot['Findings'])) {
+        if (-not $f['LearnMoreLink']) { continue }
+        $cat = $f['Category'] ?? 'other'
+        if (-not $byCategory.ContainsKey($cat)) { $byCategory[$cat] = $f['LearnMoreLink'] }
+    }
+    if ($byCategory.Count -eq 0) {
+        Add-AzMonPptxText -Slide $slide -X 1 -Y 3 -Width 11 -Height 1 -Text 'No Learn More links available for this assessment.' -Size 18 -ColorHex $script:AzMonPptxGrey
+        return
+    }
+    $y = 1.5
+    foreach ($cat in ($byCategory.Keys | Sort-Object)) {
+        Add-AzMonPptxText -Slide $slide -X 0.7 -Y $y -Width 3.2 -Height 0.45 -Text (Get-AzMonCategoryLabel $cat) -Size 14 -Bold -ColorHex $script:AzMonPptxNavy
+        Add-AzMonPptxText -Slide $slide -X 4.0 -Y $y -Width 8.6 -Height 0.45 -Text $byCategory[$cat] -Size 12 -ColorHex $script:AzMonPptxBlue
+        $y += 0.55
+    }
 }
 
 function Add-AzMonPptxTopFindingsSlide {

@@ -235,6 +235,53 @@ function Add-AzMonPptxShareBar {
     }
 }
 
+function Add-AzMonPptxTable {
+    <#
+    .SYNOPSIS
+        Simple grid table (header row + data rows) built from plain
+        rectangles/text boxes, since the builder has no native table part.
+        Long cell text is the caller's responsibility to pre-truncate —
+        a fixed-height row does not auto-expand for overflow text.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $Slide,
+        [Parameter(Mandatory)] [double] $X, [Parameter(Mandatory)] [double] $Y,
+        [Parameter(Mandatory)] [string[]] $Header,
+        [Parameter(Mandatory)] [double[]] $ColumnWidth,
+        [Parameter(Mandatory)] [AllowEmptyCollection()] [array] $Row,
+        [double] $HeaderHeight = 0.4,
+        [double] $RowHeight = 0.42,
+        [int] $HeaderSize = 12,
+        [int] $RowSize = 11,
+        [string] $HeaderFillHex = '1F3A5F',
+        [string] $HeaderFontHex = 'FFFFFF',
+        [string] $AltRowFillHex = 'EEF2F7'
+    )
+    $totalWidth = ($ColumnWidth | Measure-Object -Sum).Sum
+    Add-AzMonPptxRect -Slide $Slide -X $X -Y $Y -Width $totalWidth -Height $HeaderHeight -ColorHex $HeaderFillHex
+    $cx = $X
+    for ($c = 0; $c -lt $Header.Count; $c++) {
+        Add-AzMonPptxText -Slide $Slide -X ($cx + 0.06) -Y ($Y + 0.04) -Width ($ColumnWidth[$c] - 0.12) -Height ($HeaderHeight - 0.06) -Text $Header[$c] -Size $HeaderSize -Bold -ColorHex $HeaderFontHex
+        $cx += $ColumnWidth[$c]
+    }
+    $rowY = $Y + $HeaderHeight
+    for ($r = 0; $r -lt $Row.Count; $r++) {
+        if ($r % 2 -eq 1) {
+            Add-AzMonPptxRect -Slide $Slide -X $X -Y $rowY -Width $totalWidth -Height $RowHeight -ColorHex $AltRowFillHex
+        }
+        $cx = $X
+        $cells = @($Row[$r])
+        for ($c = 0; $c -lt $Header.Count; $c++) {
+            $val = if ($c -lt $cells.Count) { [string]$cells[$c] } else { '' }
+            Add-AzMonPptxText -Slide $Slide -X ($cx + 0.06) -Y ($rowY + 0.03) -Width ($ColumnWidth[$c] - 0.12) -Height ($RowHeight - 0.05) -Text $val -Size $RowSize -ColorHex '1F3A5F'
+            $cx += $ColumnWidth[$c]
+        }
+        $rowY += $RowHeight
+    }
+    return $rowY
+}
+
 # ---- static OOXML template parts ---------------------------------------
 
 $script:AzMonPptxRootRels = @'
