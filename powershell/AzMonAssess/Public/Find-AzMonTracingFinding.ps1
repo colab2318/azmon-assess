@@ -13,7 +13,8 @@ function Find-AzMonTracingFinding {
         [Parameter(Mandatory)] [AllowEmptyCollection()] [array] $AppInsight
     )
     $findings = [System.Collections.Generic.List[hashtable]]::new()
-    if (-not $ResourceRef -or $ResourceRef.Count -eq 0) { return @() }
+    $compliance = [System.Collections.Generic.List[hashtable]]::new()
+    if (-not $ResourceRef -or $ResourceRef.Count -eq 0) { return @{ Findings = @(); ComplianceItems = @() } }
 
     $candidates = @($ResourceRef | Where-Object { $script:AzMonTraceCandidateTypes -contains ([string]$_['Type']).ToLowerInvariant() })
     $aiWorkspaceBased = @($AppInsight | Where-Object { $_['WorkspaceResourceId'] })
@@ -38,7 +39,11 @@ function Find-AzMonTracingFinding {
             ) `
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/app/opentelemetry-enable' `
             -Evidence @{ candidate_count = $candidates.Count; workspace_based_ai_count = $aiWorkspaceBased.Count; candidate_types = $byType }))
+    } elseif ($candidates.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'tracing' -CheckId 'tracing.low-coverage' `
+            -Title "Distributed-tracing coverage across $($candidates.Count) web / integration workload(s) is adequate" `
+            -ResourceIds @($candidates | ForEach-Object { $_['Id'] })))
     }
 
-    return $findings.ToArray()
+    return @{ Findings = $findings.ToArray(); ComplianceItems = $compliance.ToArray() }
 }

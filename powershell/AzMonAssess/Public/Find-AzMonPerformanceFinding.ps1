@@ -14,6 +14,7 @@ function Find-AzMonPerformanceFinding {
         [Parameter(Mandatory)] [AllowEmptyCollection()] [array] $AppInsight
     )
     $findings = [System.Collections.Generic.List[hashtable]]::new()
+    $compliance = [System.Collections.Generic.List[hashtable]]::new()
     $wsById = @{}
     foreach ($ws in $Workspace) { $wsById[([string]$ws['Id']).ToLowerInvariant()] = $ws }
 
@@ -33,6 +34,10 @@ function Find-AzMonPerformanceFinding {
                     'retire the mis-regioned resource.') `
                 -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/workspace-design' `
                 -Evidence @{ ai_location = $ai['Location']; workspace_location = $ws['Location'] }))
+        } elseif ($ai['Location'] -and $ws['Location']) {
+            $compliance.Add((New-AzMonComplianceItem -Category 'performance' -CheckId 'performance.region-mismatch' `
+                -Title "App Insights '$($ai['Name'])' is colocated with workspace '$($ws['Name'])'" `
+                -ResourceIds @($ai['Id'], $ws['Id'])))
         }
     }
 
@@ -51,6 +56,10 @@ function Find-AzMonPerformanceFinding {
                     'vs. current pay-as-you-go cost first.') `
                 -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-dedicated-clusters' `
                 -Evidence @{ ingestion_gb_30d = $gb30 }))
+        } elseif ($gb30 -ge $script:AzMonDedicatedClusterThresholdGb30d -and $ws['ClusterResourceId']) {
+            $compliance.Add((New-AzMonComplianceItem -Category 'performance' -CheckId 'performance.dedicated-cluster-candidate' `
+                -Title "$($ws['Name']): $([Math]::Round($gb30,0)) GB/30d - already on a dedicated cluster" `
+                -ResourceIds @($ws['Id'])))
         }
     }
 
@@ -65,7 +74,12 @@ function Find-AzMonPerformanceFinding {
                 $candidates.Add(@{ Table = $t; Gb = [Math]::Round($gb, 2) })
             }
         }
-        if ($candidates.Count -eq 0) { continue }
+        if ($candidates.Count -eq 0) {
+            $compliance.Add((New-AzMonComplianceItem -Category 'performance' -CheckId 'performance.search-jobs-candidate' `
+                -Title "$($ws['Name']): no high-volume tables need Search Jobs / Basic tier despite $($ws['RetentionDays'])d retention" `
+                -ResourceIds @($ws['Id'])))
+            continue
+        }
         $findings.Add((New-AzMonFinding -Category 'performance' -Severity 'medium' `
             -Title "$($ws['Name']): $($candidates.Count) high-volume tables with >30d retention - consider Search Jobs / Basic tier + long-term archive" `
             -CheckId 'performance.search-jobs-candidate' `
@@ -79,5 +93,5 @@ function Find-AzMonPerformanceFinding {
             -Evidence @{ tables = @($candidates | ForEach-Object { , @($_.Table, $_.Gb) }); retention_days = $ws['RetentionDays'] }))
     }
 
-    return $findings.ToArray()
+    return @{ Findings = $findings.ToArray(); ComplianceItems = $compliance.ToArray() }
 }

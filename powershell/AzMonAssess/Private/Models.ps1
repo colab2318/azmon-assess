@@ -262,6 +262,30 @@ function New-AzMonFinding {
     }
 }
 
+function New-AzMonComplianceItem {
+    <#
+    .SYNOPSIS
+        The "passing" counterpart to a Finding - resources a check examined
+        and found compliant, rather than flagged. Same CheckId/Category
+        vocabulary as findings so a report can show both sides of one check.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Category,
+        [Parameter(Mandatory)] [string] $Title,
+        [Parameter(Mandatory)] [string] $CheckId,
+        [string[]] $ResourceIds = @()
+    )
+    @{
+        Kind        = 'ComplianceItem'
+        Id          = [guid]::NewGuid().ToString()
+        CheckId     = $CheckId
+        Category    = $Category
+        Title       = $Title
+        ResourceIds = @($ResourceIds)
+    }
+}
+
 function New-AzMonSnapshotObject {
     [CmdletBinding()]
     param(
@@ -276,6 +300,7 @@ function New-AzMonSnapshotObject {
         [array] $Resources = @(),
         [array] $DataCollectionRules = @(),
         [array] $Findings = @(),
+        [array] $ComplianceItems = @(),
         [string] $AiSummary
     )
     @{
@@ -291,6 +316,7 @@ function New-AzMonSnapshotObject {
         Resources           = @($Resources)
         DataCollectionRules = @($DataCollectionRules)
         Findings            = @($Findings)
+        ComplianceItems     = @($ComplianceItems)
         AiSummary           = $AiSummary
     }
 }

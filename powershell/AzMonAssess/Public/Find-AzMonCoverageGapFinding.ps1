@@ -42,6 +42,7 @@ function Find-AzMonCoverageGapFinding {
         [object] $DcrAssociatedId = $null
     )
     $findings = [System.Collections.Generic.List[hashtable]]::new()
+    $compliance = [System.Collections.Generic.List[hashtable]]::new()
 
     $diagByTarget = @{}
     foreach ($d in $DiagnosticSetting) {
@@ -64,6 +65,10 @@ function Find-AzMonCoverageGapFinding {
     $notToWs = [System.Collections.Generic.List[hashtable]]::new()
     $webWithoutAi = [System.Collections.Generic.List[hashtable]]::new()
     $vmNoHeartbeat = [System.Collections.Generic.List[hashtable]]::new()
+    $hasDiag = [System.Collections.Generic.List[hashtable]]::new()
+    $toWs = [System.Collections.Generic.List[hashtable]]::new()
+    $webWithAi = [System.Collections.Generic.List[hashtable]]::new()
+    $vmWithHeartbeat = [System.Collections.Generic.List[hashtable]]::new()
 
     foreach ($r in $ResourceRef) {
         $rtype = ([string]$r['Type']).ToLowerInvariant()
@@ -74,6 +79,7 @@ function Find-AzMonCoverageGapFinding {
             if (@($settings).Count -eq 0) {
                 $missingDiag.Add($r)
             } else {
+                $hasDiag.Add($r)
                 $hasWsDest = $false
                 foreach ($s in $settings) {
                     # LogsEnabled matters: a setting can have a WorkspaceId
@@ -81,7 +87,7 @@ function Find-AzMonCoverageGapFinding {
                     # sending zero log data despite "having a destination".
                     if ($s['WorkspaceId'] -and $s['LogsEnabled'] -and $wsIds.ContainsKey(([string]$s['WorkspaceId']).ToLowerInvariant())) { $hasWsDest = $true; break }
                 }
-                if (-not $hasWsDest) { $notToWs.Add($r) }
+                if (-not $hasWsDest) { $notToWs.Add($r) } else { $toWs.Add($r) }
             }
         }
 
@@ -93,11 +99,11 @@ function Find-AzMonCoverageGapFinding {
             foreach ($c in $candidates) {
                 if ($rNameLower.Contains($c) -or $c.Contains($rNameLower)) { $match = $true; break }
             }
-            if (-not $match) { $webWithoutAi.Add($r) }
+            if (-not $match) { $webWithoutAi.Add($r) } else { $webWithAi.Add($r) }
         }
 
         if ($rtype -eq 'microsoft.compute/virtualmachines' -and $null -ne $HeartbeatResourceId) {
-            if (-not $HeartbeatResourceId.Contains($rid)) { $vmNoHeartbeat.Add($r) }
+            if (-not $HeartbeatResourceId.Contains($rid)) { $vmNoHeartbeat.Add($r) } else { $vmWithHeartbeat.Add($r) }
         }
     }
 
@@ -114,6 +120,11 @@ function Find-AzMonCoverageGapFinding {
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/diagnostic-settings' `
             -Evidence @{ by_type = Get-AzMonCountByType -ResourceRef $missingDiag.ToArray() }))
     }
+    if ($hasDiag.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'coverage' -CheckId 'coverage.missing-diagnostic-settings' `
+            -Title "$($hasDiag.Count) critical resources have diagnostic settings configured" `
+            -ResourceIds @($hasDiag | ForEach-Object { $_['Id'] })))
+    }
 
     if ($notToWs.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'coverage' -Severity 'medium' `
@@ -127,6 +138,11 @@ function Find-AzMonCoverageGapFinding {
             -Recommendation 'Add a workspace destination with Logs categories enabled to each diagnostic setting.' `
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/diagnostic-settings' `
             -Evidence @{ by_type = Get-AzMonCountByType -ResourceRef $notToWs.ToArray() }))
+    }
+    if ($toWs.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'coverage' -CheckId 'coverage.diagnostic-not-to-workspace' `
+            -Title "$($toWs.Count) resources correctly route a Logs category to a Log Analytics workspace" `
+            -ResourceIds @($toWs | ForEach-Object { $_['Id'] })))
     }
 
     if ($webWithoutAi.Count -gt 0) {
@@ -144,6 +160,11 @@ function Find-AzMonCoverageGapFinding {
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/app/opentelemetry-enable' `
             -Evidence @{ by_type = Get-AzMonCountByType -ResourceRef $webWithoutAi.ToArray() }))
     }
+    if ($webWithAi.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'coverage' -CheckId 'coverage.web-without-app-insights' `
+            -Title "$($webWithAi.Count) web apps / container apps have an obvious Application Insights component" `
+            -ResourceIds @($webWithAi | ForEach-Object { $_['Id'] })))
+    }
 
     if ($vmNoHeartbeat.Count -gt 0) {
         $findings.Add((New-AzMonFinding -Category 'coverage' -Severity 'high' `
@@ -158,6 +179,11 @@ function Find-AzMonCoverageGapFinding {
                 'health if it was previously connected.') `
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-overview'))
     }
+    if ($vmWithHeartbeat.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'coverage' -CheckId 'coverage.vm-no-heartbeat' `
+            -Title "$($vmWithHeartbeat.Count) VMs have a recent Heartbeat" `
+            -ResourceIds @($vmWithHeartbeat | ForEach-Object { $_['Id'] })))
+    }
 
     $classicAi = @($AppInsight | Where-Object { -not $_['WorkspaceResourceId'] })
     if ($classicAi.Count -gt 0) {
@@ -171,6 +197,12 @@ function Find-AzMonCoverageGapFinding {
                 'https://learn.microsoft.com/azure/azure-monitor/app/convert-classic-resource') `
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/app/convert-classic-resource' `
             -Evidence @{ components = @($classicAi | ForEach-Object { $_['Name'] }) }))
+    }
+    $workspaceBasedAi = @($AppInsight | Where-Object { $_['WorkspaceResourceId'] })
+    if ($workspaceBasedAi.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'coverage' -CheckId 'coverage.classic-app-insights' `
+            -Title "$($workspaceBasedAi.Count) Application Insights components are workspace-based" `
+            -ResourceIds @($workspaceBasedAi | ForEach-Object { $_['Id'] })))
     }
 
     # ---- Orphaned Data Collection Rules ---------------------------------
@@ -189,7 +221,13 @@ function Find-AzMonCoverageGapFinding {
                 -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/data-collection-rule-overview' `
                 -Evidence @{ names = @($orphanedDcrs | ForEach-Object { $_['Name'] }) }))
         }
+        $associatedDcrs = @($DataCollectionRule | Where-Object { $DcrAssociatedId.Contains(([string]$_['Id']).ToLowerInvariant()) })
+        if ($associatedDcrs.Count -gt 0) {
+            $compliance.Add((New-AzMonComplianceItem -Category 'coverage' -CheckId 'coverage.orphaned-dcr' `
+                -Title "$($associatedDcrs.Count) Data Collection Rules have at least one resource association" `
+                -ResourceIds @($associatedDcrs | ForEach-Object { $_['Id'] })))
+        }
     }
 
-    return $findings.ToArray()
+    return @{ Findings = $findings.ToArray(); ComplianceItems = $compliance.ToArray() }
 }

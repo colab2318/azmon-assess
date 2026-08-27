@@ -22,6 +22,7 @@ function Find-AzMonAlertQualityFinding {
         [Parameter(Mandatory)] [AllowEmptyCollection()] [array] $ResourceRef
     )
     $findings = [System.Collections.Generic.List[hashtable]]::new()
+    $compliance = [System.Collections.Generic.List[hashtable]]::new()
 
     $disabled = @($AlertRule | Where-Object { -not $_['Enabled'] })
     if ($disabled.Count -gt 0) {
@@ -34,6 +35,12 @@ function Find-AzMonAlertQualityFinding {
             -Recommendation 'Review each disabled rule; either delete or re-enable with tuned thresholds.' `
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-overview' `
             -Evidence @{ names = @($disabled | Select-Object -First 50 | ForEach-Object { $_['Name'] }) }))
+    }
+    $enabledRules = @($AlertRule | Where-Object { $_['Enabled'] })
+    if ($enabledRules.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'alerting' -CheckId 'alerting.disabled-rules' `
+            -Title "$($enabledRules.Count) alert rules are enabled" `
+            -ResourceIds @($enabledRules | ForEach-Object { $_['Id'] })))
     }
 
     $silent = @($AlertRule | Where-Object { $_['Enabled'] -and @($_['ActionGroupIds']).Count -eq 0 })
@@ -48,6 +55,12 @@ function Find-AzMonAlertQualityFinding {
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/action-groups' `
             -Evidence @{ names = @($silent | Select-Object -First 50 | ForEach-Object { $_['Name'] }) }))
     }
+    $notified = @($AlertRule | Where-Object { $_['Enabled'] -and @($_['ActionGroupIds']).Count -gt 0 })
+    if ($notified.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'alerting' -CheckId 'alerting.silent-rules' `
+            -Title "$($notified.Count) enabled alert rules have at least one action group" `
+            -ResourceIds @($notified | ForEach-Object { $_['Id'] })))
+    }
 
     $orphans = @($ActionGroup | Where-Object { $_['UsedByRules'] -eq 0 })
     if ($orphans.Count -gt 0) {
@@ -60,6 +73,12 @@ function Find-AzMonAlertQualityFinding {
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/action-groups' `
             -Evidence @{ names = @($orphans | ForEach-Object { $_['Name'] }) }))
     }
+    $usedActionGroups = @($ActionGroup | Where-Object { $_['UsedByRules'] -gt 0 })
+    if ($usedActionGroups.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'alerting' -CheckId 'alerting.orphaned-action-groups' `
+            -Title "$($usedActionGroups.Count) action groups are referenced by at least one rule" `
+            -ResourceIds @($usedActionGroups | ForEach-Object { $_['Id'] })))
+    }
 
     $unsevered = @($AlertRule | Where-Object { $_['Enabled'] -and $null -eq $_['Severity'] })
     if ($unsevered.Count -gt 0) {
@@ -70,6 +89,12 @@ function Find-AzMonAlertQualityFinding {
             -ResourceIds @($unsevered | Select-Object -First 100 | ForEach-Object { $_['Id'] }) `
             -Recommendation 'Set severity 0-4 explicitly on all rules; standardize per runbook.' `
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-overview'))
+    }
+    $severed = @($AlertRule | Where-Object { $_['Enabled'] -and $null -ne $_['Severity'] })
+    if ($severed.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'alerting' -CheckId 'alerting.missing-severity' `
+            -Title "$($severed.Count) rules set an explicit severity" `
+            -ResourceIds @($severed | Select-Object -First 100 | ForEach-Object { $_['Id'] })))
     }
 
     # ---- Noisy rules: high fire-rate over the last 30 days -------------
@@ -89,6 +114,12 @@ function Find-AzMonAlertQualityFinding {
                 'suppress during known maintenance, or replace with a smarter dynamic-threshold condition.') `
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-dynamic-thresholds' `
             -Evidence @{ top_noisy_rules = @($noisy | Select-Object -First 10 | ForEach-Object { @{ name = $_['Name']; fire_count_30d = $_['FireCount30d'] } }) }))
+    }
+    $notNoisy = @($AlertRule | Where-Object { ($_['FireCount30d'] ?? 0) -lt $noisyThreshold })
+    if ($notNoisy.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'alerting' -CheckId 'alerting.noisy-rules' `
+            -Title "$($notNoisy.Count) rules fired fewer than $noisyThreshold times in the last 30 days" `
+            -ResourceIds @($notNoisy | Select-Object -First 50 | ForEach-Object { $_['Id'] })))
     }
 
     $typesWithRules = [System.Collections.Generic.HashSet[string]]::new()
@@ -153,6 +184,12 @@ function Find-AzMonAlertQualityFinding {
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-overview' `
             -Evidence @{ top_broad_rules = @($broadScope | Select-Object -First 10 | ForEach-Object { @{ name = $_['Name']; scope_count = @($_['Scopes']).Count } }) }))
     }
+    $narrowScope = @($AlertRule | Where-Object { $_['AlertKind'] -eq 'metric' -and $_['Enabled'] -and @($_['Scopes']).Count -lt $broadScopeThreshold })
+    if ($narrowScope.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'alerting' -CheckId 'alerting.broad-scope-metric-alerts' `
+            -Title "$($narrowScope.Count) metric alert rules are scoped to fewer than $broadScopeThreshold resources" `
+            -ResourceIds @($narrowScope | ForEach-Object { $_['Id'] })))
+    }
 
     # ---- Cost: high-frequency log search (scheduled query) alerts -------
     # "When using log search alerts, minimize log search alert frequency" -
@@ -176,6 +213,15 @@ function Find-AzMonAlertQualityFinding {
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/cost-logs' `
             -Evidence @{ rules = @($highFreqLogAlerts | Select-Object -First 10 | ForEach-Object { @{ name = $_['Name']; frequency_minutes = $_['EvaluationFrequencyMinutes'] } }) }))
     }
+    $normalFreqLogAlerts = @($AlertRule | Where-Object {
+            $_['AlertKind'] -eq 'log' -and $_['Enabled'] -and $null -ne $_['EvaluationFrequencyMinutes'] -and
+            [double]$_['EvaluationFrequencyMinutes'] -gt $highFreqThresholdMinutes
+        })
+    if ($normalFreqLogAlerts.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'alerting' -CheckId 'alerting.high-frequency-log-alerts' `
+            -Title "$($normalFreqLogAlerts.Count) log search alerts evaluate less often than every $highFreqThresholdMinutes minutes" `
+            -ResourceIds @($normalFreqLogAlerts | ForEach-Object { $_['Id'] })))
+    }
 
     # ---- Static-threshold-only metric alerts ----------------------------
     # WAF Operational Excellence: "validate dynamic thresholds against real
@@ -196,6 +242,12 @@ function Find-AzMonAlertQualityFinding {
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-dynamic-thresholds' `
             -Evidence @{ names = @($staticOnlyMetricAlerts | Select-Object -First 50 | ForEach-Object { $_['Name'] }) }))
     }
+    $dynamicThresholdAlerts = @($AlertRule | Where-Object { $_['AlertKind'] -eq 'metric' -and $_['Enabled'] -and $_['HasDynamicThreshold'] })
+    if ($dynamicThresholdAlerts.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'alerting' -CheckId 'alerting.static-threshold-only' `
+            -Title "$($dynamicThresholdAlerts.Count) enabled metric alerts use a dynamic threshold" `
+            -ResourceIds @($dynamicThresholdAlerts | Select-Object -First 50 | ForEach-Object { $_['Id'] })))
+    }
 
-    return $findings.ToArray()
+    return @{ Findings = $findings.ToArray(); ComplianceItems = $compliance.ToArray() }
 }

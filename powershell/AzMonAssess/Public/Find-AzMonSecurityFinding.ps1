@@ -8,6 +8,7 @@ function Find-AzMonSecurityFinding {
         [Parameter(Mandatory)] [AllowEmptyCollection()] [array] $AppInsight
     )
     $findings = [System.Collections.Generic.List[hashtable]]::new()
+    $compliance = [System.Collections.Generic.List[hashtable]]::new()
 
     foreach ($ws in $Workspace) {
         foreach ($pair in @(
@@ -27,6 +28,10 @@ function Find-AzMonSecurityFinding {
                         'before cutover to avoid ingestion outage.') `
                     -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/private-link-security' `
                     -Evidence @{ direction = $pair.Direction; value = $pair.Value }))
+            } elseif ($pair.Value) {
+                $compliance.Add((New-AzMonComplianceItem -Category 'security' -CheckId 'security.workspace-public-network-access' `
+                    -Title "$($ws['Name']): public network access for $($pair.Direction) is Disabled" `
+                    -ResourceIds @($ws['Id'])))
             }
         }
     }
@@ -44,6 +49,10 @@ function Find-AzMonSecurityFinding {
                     'features.disableLocalAuth = true on the workspace. Retire legacy Log Analytics Agent (MMA) ' +
                     'as part of the change.') `
                 -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/overview#microsoft-entra-authentication-for-workspace-data'))
+        } elseif ($ws['DisableLocalAuth'] -eq $true) {
+            $compliance.Add((New-AzMonComplianceItem -Category 'security' -CheckId 'security.workspace-local-auth-enabled' `
+                -Title "$($ws['Name']): shared-key (local) authentication is disabled" `
+                -ResourceIds @($ws['Id'])))
         }
     }
 
@@ -63,6 +72,10 @@ function Find-AzMonSecurityFinding {
                         "publicNetworkAccessFor$dirTitle to 'Disabled'. Ensure app hosts have a private endpoint " +
                         'route to the AMPLS.') `
                     -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/private-link-security'))
+            } elseif ($pair.Value) {
+                $compliance.Add((New-AzMonComplianceItem -Category 'security' -CheckId 'security.ai-public-network-access' `
+                    -Title "App Insights '$($ai['Name'])': public network access for $($pair.Direction) is Disabled" `
+                    -ResourceIds @($ai['Id'])))
             }
         }
     }
@@ -79,6 +92,10 @@ function Find-AzMonSecurityFinding {
                     'Monitor OpenTelemetry Distro with managed identity, then remove any embedded instrumentation ' +
                     'keys from config/secrets.') `
                 -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/app/azure-ad-authentication'))
+        } elseif ($ai['DisableLocalAuth'] -eq $true) {
+            $compliance.Add((New-AzMonComplianceItem -Category 'security' -CheckId 'security.ai-local-auth-enabled' `
+                -Title "App Insights '$($ai['Name'])': instrumentation-key auth (local auth) is disabled" `
+                -ResourceIds @($ai['Id'])))
         }
     }
 
@@ -94,6 +111,10 @@ function Find-AzMonSecurityFinding {
                 -Recommendation ('Migrate to workspace-based Application Insights (in-place, no data loss). Use ' +
                     'az monitor app-insights component update --workspace ...') `
                 -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/app/convert-classic-resource'))
+        } else {
+            $compliance.Add((New-AzMonComplianceItem -Category 'security' -CheckId 'security.ai-classic' `
+                -Title "App Insights '$($ai['Name'])' is workspace-based" `
+                -ResourceIds @($ai['Id'])))
         }
     }
 
@@ -117,8 +138,12 @@ function Find-AzMonSecurityFinding {
                     'both to the same private link scope.') `
                 -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/private-link-security' `
                 -Evidence @{ ai = $aiPub; workspace = $wsPub }))
+        } elseif ($aiPub -and $wsPub) {
+            $compliance.Add((New-AzMonComplianceItem -Category 'security' -CheckId 'security.ai-workspace-network-policy-mismatch' `
+                -Title "App Insights '$($ai['Name'])' network policy matches parent workspace '$($ws['Name'])'" `
+                -ResourceIds @($ai['Id'], $ws['Id'])))
         }
     }
 
-    return $findings.ToArray()
+    return @{ Findings = $findings.ToArray(); ComplianceItems = $compliance.ToArray() }
 }

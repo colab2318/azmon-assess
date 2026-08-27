@@ -29,7 +29,7 @@ function Import-AzMonSnapshot {
     # (and guards against any other source of stray nulls): a null element
     # in one of these arrays crashes any consumer that indexes it directly,
     # e.g. report generation doing $s['LogsEnabled'].
-    foreach ($key in @('Workspaces', 'AppInsights', 'AlertRules', 'ActionGroups', 'DiagnosticSettings', 'Resources', 'DataCollectionRules', 'Findings')) {
+    foreach ($key in @('Workspaces', 'AppInsights', 'AlertRules', 'ActionGroups', 'DiagnosticSettings', 'Resources', 'DataCollectionRules', 'Findings', 'ComplianceItems')) {
         if ($snap.ContainsKey($key)) {
             $snap[$key] = @($snap[$key] | Where-Object { $null -ne $_ })
         }

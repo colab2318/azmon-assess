@@ -20,6 +20,7 @@ function Find-AzMonCostOptimizationFinding {
         [array] $AdvisorRecommendation = @()
     )
     $findings = [System.Collections.Generic.List[hashtable]]::new()
+    $compliance = [System.Collections.Generic.List[hashtable]]::new()
 
     foreach ($ws in $Workspace) {
         $byTable = $ws['IngestionByTable']
@@ -31,7 +32,12 @@ function Find-AzMonCostOptimizationFinding {
                 $candidates.Add(@{ Table = $table; Gb = [Math]::Round($gb, 2) })
             }
         }
-        if ($candidates.Count -eq 0) { continue }
+        if ($candidates.Count -eq 0) {
+            $compliance.Add((New-AzMonComplianceItem -Category 'cost' -CheckId 'cost.basic-tier-candidate' `
+                -Title "$($ws['Name']): no verbose tables need the Basic Logs tier" `
+                -ResourceIds @($ws['Id'])))
+            continue
+        }
         $sumGb = ($candidates | Measure-Object -Property Gb -Sum).Sum
         $savings = [Math]::Round($sumGb * 2.0, 2)
         $findings.Add((New-AzMonFinding -Category 'cost' -Severity $(if ($savings -gt 200) { 'high' } else { 'medium' }) `
@@ -56,7 +62,12 @@ function Find-AzMonCostOptimizationFinding {
                 $auxCandidates.Add(@{ Table = $table; Gb = [Math]::Round($gb, 2) })
             }
         }
-        if ($auxCandidates.Count -eq 0) { continue }
+        if ($auxCandidates.Count -eq 0) {
+            $compliance.Add((New-AzMonComplianceItem -Category 'cost' -CheckId 'cost.auxiliary-tier-candidate' `
+                -Title "$($ws['Name']): no audit/security tables need the Auxiliary (Lake) tier" `
+                -ResourceIds @($ws['Id'])))
+            continue
+        }
         $auxSumGb = ($auxCandidates | Measure-Object -Property Gb -Sum).Sum
         $auxSavings = [Math]::Round($auxSumGb * 2.3, 2)
         $findings.Add((New-AzMonFinding -Category 'cost' -Severity $(if ($auxSavings -gt 200) { 'high' } else { 'medium' }) `
@@ -86,6 +97,10 @@ function Find-AzMonCostOptimizationFinding {
                     'is hit so the team is notified before data is dropped.') `
                 -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/daily-cap' `
                 -Evidence @{ ingestion_gb_30d = $gb30 }))
+        } elseif ($gb30 -gt 100 -and $ws['DailyQuotaGb']) {
+            $compliance.Add((New-AzMonComplianceItem -Category 'cost' -CheckId 'cost.no-daily-quota' `
+                -Title "$($ws['Name']): has a daily quota (dailyQuotaGb) set" `
+                -ResourceIds @($ws['Id'])))
         }
     }
 
@@ -101,6 +116,10 @@ function Find-AzMonCostOptimizationFinding {
                 -Recommendation ('Enable adaptive sampling in the SDK (default 5 items/sec target) or set an ' +
                     'ingestion sampling percentage on the AI resource.') `
                 -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/app/sampling'))
+        } else {
+            $compliance.Add((New-AzMonComplianceItem -Category 'cost' -CheckId 'cost.ai-sampling-not-configured' `
+                -Title "App Insights '$($ai['Name'])': sampling is configured ($pct%)" `
+                -ResourceIds @($ai['Id'])))
         }
     }
 
@@ -116,6 +135,10 @@ function Find-AzMonCostOptimizationFinding {
                 -Recommendation ('Set the daily volume cap via az monitor app-insights component update ' +
                     '--daily-cap <gb> and enable the "90% of cap reached" alert.') `
                 -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/daily-cap'))
+        } else {
+            $compliance.Add((New-AzMonComplianceItem -Category 'cost' -CheckId 'cost.ai-no-daily-cap' `
+                -Title "App Insights '$($ai['Name'])': has a daily volume cap configured" `
+                -ResourceIds @($ai['Id'])))
         }
     }
 
@@ -203,6 +226,12 @@ function Find-AzMonCostOptimizationFinding {
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-migration' `
             -Evidence @{ vm_count = $legacyOnlyVmIds.Count }))
     }
+    $migratedVmIds = @($agentKindsByVm.Keys | Where-Object { $agentKindsByVm[$_].Contains('ama') })
+    if ($migratedVmIds.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'cost' -CheckId 'cost.legacy-mma-agent' `
+            -Title "$($migratedVmIds.Count) VMs are running Azure Monitor Agent" `
+            -ResourceIds $migratedVmIds))
+    }
 
     # ---- Standalone workspace - commitment tier opportunity -------------
     # The consolidation analyzer only prices a commitment tier for groups of
@@ -256,5 +285,5 @@ function Find-AzMonCostOptimizationFinding {
             -Evidence @{ source = 'Azure Advisor'; impacted_field = $rec['ImpactedField'] }))
     }
 
-    return $findings.ToArray()
+    return @{ Findings = $findings.ToArray(); ComplianceItems = $compliance.ToArray() }
 }

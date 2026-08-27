@@ -147,14 +147,20 @@ function New-AzMonDemoSnapshot {
         -ActionGroups $actionGroups -Resources $resources.ToArray() -DataCollectionRules $dcrs
 
     $snapshot['Findings'] = @()
-    $snapshot['Findings'] += Find-AzMonConsolidationFinding -Workspace $workspaceArr
-    $snapshot['Findings'] += Find-AzMonCoverageGapFinding -ResourceRef $resources.ToArray() -DiagnosticSetting @() -Workspace $workspaceArr -AppInsight $appInsights -HeartbeatResourceId $heartbeatResourceIds -DataCollectionRule $dcrs -DcrAssociatedId $dcrAssociatedIds
-    $snapshot['Findings'] += Find-AzMonAlertQualityFinding -AlertRule $rules.ToArray() -ActionGroup $actionGroups -ResourceRef $resources.ToArray()
-    $snapshot['Findings'] += Find-AzMonCostOptimizationFinding -Workspace $workspaceArr -AppInsight $appInsights -VmAgentExtension $vmAgentExtensions -AdvisorRecommendation $advisorRecommendations
-    $snapshot['Findings'] += Find-AzMonTracingFinding -ResourceRef $resources.ToArray() -AppInsight $appInsights
-    $snapshot['Findings'] += Find-AzMonReliabilityFinding -Workspace $workspaceArr -AppInsight $appInsights -AlertRule $rules.ToArray() -DiagnosticSetting @() -ResourceRef $resources.ToArray() -SubscriptionId @('demo')
-    $snapshot['Findings'] += Find-AzMonSecurityFinding -Workspace $workspaceArr -AppInsight $appInsights
-    $snapshot['Findings'] += Find-AzMonPerformanceFinding -Workspace $workspaceArr -AppInsight $appInsights
+    $snapshot['ComplianceItems'] = @()
+    foreach ($result in @(
+            (Find-AzMonConsolidationFinding -Workspace $workspaceArr),
+            (Find-AzMonCoverageGapFinding -ResourceRef $resources.ToArray() -DiagnosticSetting @() -Workspace $workspaceArr -AppInsight $appInsights -HeartbeatResourceId $heartbeatResourceIds -DataCollectionRule $dcrs -DcrAssociatedId $dcrAssociatedIds),
+            (Find-AzMonAlertQualityFinding -AlertRule $rules.ToArray() -ActionGroup $actionGroups -ResourceRef $resources.ToArray()),
+            (Find-AzMonCostOptimizationFinding -Workspace $workspaceArr -AppInsight $appInsights -VmAgentExtension $vmAgentExtensions -AdvisorRecommendation $advisorRecommendations),
+            (Find-AzMonTracingFinding -ResourceRef $resources.ToArray() -AppInsight $appInsights),
+            (Find-AzMonReliabilityFinding -Workspace $workspaceArr -AppInsight $appInsights -AlertRule $rules.ToArray() -DiagnosticSetting @() -ResourceRef $resources.ToArray() -SubscriptionId @('demo')),
+            (Find-AzMonSecurityFinding -Workspace $workspaceArr -AppInsight $appInsights),
+            (Find-AzMonPerformanceFinding -Workspace $workspaceArr -AppInsight $appInsights)
+        )) {
+        $snapshot['Findings'] += @($result.Findings)
+        $snapshot['ComplianceItems'] += @($result.ComplianceItems)
+    }
 
     $snapshot['AiSummary'] = New-AzMonAiSummary -Snapshot $snapshot -AoaiEndpoint $AoaiEndpoint -AoaiDeployment $AoaiDeployment -AoaiApiVersion $AoaiApiVersion
     return $snapshot

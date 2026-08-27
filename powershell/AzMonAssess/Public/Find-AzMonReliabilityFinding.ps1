@@ -29,6 +29,7 @@ function Find-AzMonReliabilityFinding {
         [string[]] $SubscriptionId = @()
     )
     $findings = [System.Collections.Generic.List[hashtable]]::new()
+    $compliance = [System.Collections.Generic.List[hashtable]]::new()
     $azRegions = Get-AzMonAzRegionSet
 
     $tagsById = @{}
@@ -49,6 +50,10 @@ function Find-AzMonReliabilityFinding {
                     'dual-write diagnostic settings for mission-critical resources.') `
                 -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/availability-zones' `
                 -Evidence @{ location = $ws['Location']; az_capable = $false }))
+        } elseif ($loc) {
+            $compliance.Add((New-AzMonComplianceItem -Category 'reliability' -CheckId 'reliability.workspace-non-az-region' `
+                -Title "$($ws['Name']): region '$($ws['Location'])' supports workspace availability zones" `
+                -ResourceIds @($ws['Id'])))
         }
     }
 
@@ -76,6 +81,10 @@ function Find-AzMonReliabilityFinding {
                 -Recommendation ('Add a second destination (storage account for cheap long-term retention or a ' +
                     'paired workspace in another region) to the diagnostic setting.') `
                 -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/diagnostic-settings'))
+        } elseif ($prod -and $hasWorkspace -and ($hasStorage -or $hasEventHub)) {
+            $compliance.Add((New-AzMonComplianceItem -Category 'reliability' -CheckId 'reliability.single-log-destination' `
+                -Title "Prod resource $(($resourceId -split '/')[-1]): has more than one log destination" `
+                -ResourceIds @($resourceId)))
         }
     }
 
@@ -101,6 +110,12 @@ function Find-AzMonReliabilityFinding {
                 'fire when ingestion stops for >30 min. Link it to the primary action group.') `
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-analytics-workspace-health'))
     }
+    $healthAlertedWorkspaces = @($Workspace | Where-Object { $alertedWorkspaces.Contains(([string]$_['Id']).ToLowerInvariant()) -and (([double]($_['IngestionGb30d'] ?? 0)) -ge 1) })
+    if ($healthAlertedWorkspaces.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'reliability' -CheckId 'reliability.workspace-no-health-alert' `
+            -Title "$($healthAlertedWorkspaces.Count) active workspace(s) have a health / ingestion alert configured" `
+            -ResourceIds @($healthAlertedWorkspaces | ForEach-Object { $_['Id'] })))
+    }
 
     $wsById = @{}
     foreach ($ws in $Workspace) { $wsById[([string]$ws['Id']).ToLowerInvariant()] = $ws }
@@ -120,6 +135,10 @@ function Find-AzMonReliabilityFinding {
                     'workspace, then migrate SDK connection strings during the next release.') `
                 -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/azure-monitor/logs/availability-zones' `
                 -Evidence @{ location = $ai['Location']; workspace_location = $parent['Location'] }))
+        } elseif ($aiLoc) {
+            $compliance.Add((New-AzMonComplianceItem -Category 'reliability' -CheckId 'reliability.ai-non-az-region' `
+                -Title "App Insights '$($ai['Name'])' is in an AZ-capable region" `
+                -ResourceIds @($ai['Id'])))
         }
     }
 
@@ -150,6 +169,12 @@ function Find-AzMonReliabilityFinding {
             -LearnMoreLink 'https://learn.microsoft.com/en-us/azure/service-health/alerts-activity-log-service-notifications-arm' `
             -Evidence @{ subscription_ids = $uncoveredSubs }))
     }
+    $coveredSubs = @($SubscriptionId | Where-Object { $serviceHealthCoveredSubs.Contains(([string]$_).ToLowerInvariant()) })
+    if ($coveredSubs.Count -gt 0) {
+        $compliance.Add((New-AzMonComplianceItem -Category 'reliability' -CheckId 'reliability.service-health-alert-missing' `
+            -Title "$($coveredSubs.Count) subscription(s) have an Azure Service Health alert configured" `
+            -ResourceIds @($coveredSubs | ForEach-Object { "/subscriptions/$_" })))
+    }
 
-    return $findings.ToArray()
+    return @{ Findings = $findings.ToArray(); ComplianceItems = $compliance.ToArray() }
 }

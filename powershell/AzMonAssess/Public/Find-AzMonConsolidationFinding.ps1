@@ -8,7 +8,7 @@ function Find-AzMonConsolidationFinding {
     param([Parameter(Mandatory)] [AllowEmptyCollection()] [array] $Workspace)
 
     $findings = [System.Collections.Generic.List[hashtable]]::new()
-    if (-not $Workspace -or $Workspace.Count -eq 0) { return @() }
+    if (-not $Workspace -or $Workspace.Count -eq 0) { return @{ Findings = @(); ComplianceItems = @() } }
 
     $groups = @{}
     foreach ($ws in $Workspace) {
@@ -92,5 +92,5 @@ function Find-AzMonConsolidationFinding {
         }
     }
 
-    return $findings.ToArray()
+    return @{ Findings = $findings.ToArray(); ComplianceItems = @() }
 }

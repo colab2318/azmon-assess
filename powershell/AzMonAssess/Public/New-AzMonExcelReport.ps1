@@ -25,6 +25,7 @@ function New-AzMonExcelReport {
     Add-AzMonExcelSummarySheet -Workbook $wb -Snapshot $Snapshot
     Add-AzMonExcelFindingsSheet -Workbook $wb -Snapshot $Snapshot
     Add-AzMonExcelImpactedResourcesSheet -Workbook $wb -Snapshot $Snapshot -Lookup $lookup
+    Add-AzMonExcelCompliantResourcesSheet -Workbook $wb -Snapshot $Snapshot -Lookup $lookup
     Add-AzMonExcelWorkspacesSheet -Workbook $wb -Snapshot $Snapshot
     Add-AzMonExcelAppInsightsSheet -Workbook $wb -Snapshot $Snapshot
     Add-AzMonExcelAlertsSheet -Workbook $wb -Snapshot $Snapshot
@@ -208,6 +209,51 @@ function Add-AzMonExcelImpactedResourcesSheet {
         }
     }
     Set-AzMonXlsxColumnWidths -Sheet $ws -Width @(18, 14, 26, 36, 20, 14, 26, 60, 10, 10, 10, 10, 10, 40, 10, 20, 30, 24, 60, 14, 12, 20, 16, 16, 16, 20, 36)
+    Set-AzMonXlsxFreezeHeader -Sheet $ws
+    Set-AzMonXlsxAutoFilter -Sheet $ws
+}
+
+function Add-AzMonExcelCompliantResourcesSheet {
+    <#
+    .SYNOPSIS
+        The "what's going well" counterpart to 4.ImpactedResourcesAnalysis:
+        one row per (check, resource) pair that was examined and found
+        COMPLIANT, rather than flagged as a finding. Not every check has a
+        clean per-resource pass/fail (aggregate findings like consolidation,
+        or Azure Advisor recommendations, don't produce compliance items),
+        so this sheet is a partial but genuinely representative view of
+        what's already correctly configured.
+    #>
+    param([hashtable] $Workbook, [hashtable] $Snapshot, [hashtable] $Lookup)
+
+    $items = @($Snapshot['ComplianceItems']) | Sort-Object -Property `
+        @{ Expression = { $_['Category'] } }, `
+        @{ Expression = { $_['CheckId'] } }
+    $ws = Add-AzMonXlsxSheet -Workbook $Workbook -Name 'Compliant Resources'
+    $header = @(
+        'Category', 'WAF Pillar', 'Check', 'What''s Compliant', 'Resource Type', 'subscriptionId',
+        'resourceGroup', 'location', 'name', 'id'
+    )
+    Add-AzMonXlsxHeaderRow -Sheet $ws -Header $header | Out-Null
+
+    if ($items.Count -eq 0) {
+        Add-AzMonXlsxRow -Sheet $ws -Cell (@('No compliance data') + (1..8 | ForEach-Object { '' })) | Out-Null
+    }
+    foreach ($item in $items) {
+        $resourceIds = @($item['ResourceIds'])
+        if ($resourceIds.Count -eq 0) { $resourceIds = @('') }
+        foreach ($rid in $resourceIds) {
+            $desc = if ($rid) { Resolve-AzMonResourceDescriptor -ResourceId $rid -Lookup $Lookup } else { @{ Name = ''; Type = ''; ResourceGroup = ''; Location = ''; SubscriptionId = '' } }
+            $cells = @(
+                (Get-AzMonCategoryLabel $item['Category']), (Get-AzMonWafPillar $item['Category']), $item['CheckId'], $item['Title'],
+                $desc.Type, $desc.SubscriptionId, $desc.ResourceGroup, $desc.Location, $desc.Name, $rid
+            )
+            $rowNum = Add-AzMonXlsxRow -Sheet $ws -Cell $cells
+            Set-AzMonXlsxCellWrap -Sheet $ws -Row $rowNum -Column 4
+            $ws.Rows[$rowNum - 1].Cells[3].FillHex = $script:AzMonSevFillHex['low']
+        }
+    }
+    Set-AzMonXlsxColumnWidths -Sheet $ws -Width @(14, 20, 40, 55, 26, 36, 20, 14, 26, 60)
     Set-AzMonXlsxFreezeHeader -Sheet $ws
     Set-AzMonXlsxAutoFilter -Sheet $ws
 }
