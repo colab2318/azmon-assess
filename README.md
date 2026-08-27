@@ -36,6 +36,7 @@ cd powershell
 | **Multi-format reports** — HTML, Markdown, **Excel workbook** (incl. resource-centric Impacted Resources Analysis sheet), **PowerPoint deck** | Analyst + executive audience |
 | **Interactive / batch triage** — decisions per finding, resumable sessions | Structured follow-through |
 | **Safe remediation** — dry-run by default; applies daily-quota, retention, table-plan, sampling, silent-alert, public-network, local-auth fixes via ARM REST | Close the loop from finding to fix |
+| **Environment reconciliation** — re-check findings against the current Azure state, auto-mark resolved ones in report.xlsx, then build a final report from only reviewer-confirmed still-open items | Clean handoff after a review pass, no re-litigating fixed items |
 | Bicep alerting starter pack + generated runbooks for manual actions (AZ migration, health alerts, dedicated cluster, Search Jobs) | Actionable deliverable |
 
 ## Outputs
@@ -51,6 +52,8 @@ Files land in the `-Output` directory (default `./out`):
 - `triage.template.yaml` / `.json` — skeleton for batch triage (from `triage -EmitTemplate`)
 - `remediation-log.json` — audit trail of every dry-run / applied change (from `remediate`)
 - `runbooks/runbook-*.md` — generated markdown runbooks for manual-only actions
+- `verification-log.json` — audit trail of every review-status change (from `verify`)
+- `report-final.*` — filtered deliverables containing only reviewer-confirmed still-open findings (from `finalize`)
 
 ## What gets collected
 
@@ -80,7 +83,7 @@ bicep/                  # Standardized alert + diagnostic baseline
 
 ## Safety
 
-- Assessment commands (`run`, `consolidate`, `gaps`, `alerts`, `cost`, `tracing`, `reliability`, `security`, `performance`, `demo`, `report`, `triage`) are **read-only**
+- Assessment commands (`run`, `consolidate`, `gaps`, `alerts`, `cost`, `tracing`, `reliability`, `security`, `performance`, `demo`, `report`, `triage`, `verify`, `finalize`) are **read-only**
 - `remediate` **defaults to dry-run** — no changes are made without `-Apply`
 - Every applied change is logged to `remediation-log.json` with before/after values
 - No secrets logged or written to disk

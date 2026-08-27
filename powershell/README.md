@@ -135,6 +135,17 @@ All commands go through `./azmon-assess.ps1 <command> [options]`.
 # Remediate — dry-run by default, add -Apply to actually change Azure
 ./azmon-assess.ps1 remediate -Snapshot ./out/snapshot.json -TriagePath ./out/triage.json -Output ./out
 ./azmon-assess.ps1 remediate -Snapshot ./out/snapshot.json -TriagePath ./out/triage.json -Output ./out -Apply -ActionGroup "/subscriptions/<sub>/resourceGroups/<rg>/providers/microsoft.insights/actionGroups/<name>"
+
+# Re-check every finding against the current Azure state and mark ones that
+# are no longer detected "Reviewed - Implemented" directly in report.xlsx
+./azmon-assess.ps1 verify -Snapshot ./out/snapshot.json -Live
+# ...or compare against an already-collected fresh snapshot instead of -Live
+./azmon-assess.ps1 verify -Snapshot ./out/snapshot.json -CurrentSnapshot ./out-rerun/snapshot.json
+
+# After manually reviewing report.xlsx (e.g. a copy saved as report_updated.xlsx)
+# and typing "Reviewed - Not Implemented" into rows you've confirmed are still
+# open, build a clean report containing only those confirmed-open findings
+./azmon-assess.ps1 finalize -Snapshot ./out/snapshot.json -Output ./out
 ```
 
 Common options: `-SubscriptionId <id,id,...>` / `-ManagementGroupId <id>` (defaults to
@@ -143,6 +154,24 @@ auto-discovering every subscription your identity can see), `-CustomerName`,
 `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_DEPLOYMENT` / `AZURE_OPENAI_API_VERSION`
 environment variables), `-LookbackDays` (default 30), `-SkipIngestionEnrichment`
 (faster, skips the per-workspace KQL calls), `-SkipAiSummary`.
+
+### Review workflow (verify → finalize)
+
+`verify` re-runs the same analyzers used at assessment time against your
+current environment and patches only the "REQUIRED ACTIONS / REVIEW STATUS"
+column of the existing `4.ImpactedResourcesAnalysis` sheet in place — every
+other cell, style, and sheet is untouched. Statuses: `Not Reviewed` (default),
+`Reviewed - Implemented` (condition no longer detected), `Needs Manual Review`
+(resource couldn't be confirmed — deleted/renamed/inaccessible), `Regression -
+Reopened` (was implemented, condition came back). Every change is appended to
+`verification-log.json` for audit purposes.
+
+From there, a human can open `report.xlsx` (save a copy, e.g.
+`report_updated.xlsx`) and type `Reviewed - Not Implemented` into any row
+they've personally confirmed is still genuinely open. `finalize` reads those
+annotations back out and renders `report-final.html` / `report-final.pptx`
+containing only the findings/resources confirmed still open — nothing else.
+This works even after the file has been opened and saved in real Excel.
 
 ## Using the module directly (no wrapper script)
 
@@ -174,10 +203,13 @@ Written to `-Output` (default `./out`):
 - `triage.json` / `triage.template.yaml` — triage decisions / template
 - `remediation-log.json` — audit trail of every dry-run / applied change
 - `runbooks/runbook-*.md` — generated runbooks for manual-only actions
+- `verification-log.json` — audit trail of every review-status change applied by `verify`
+- `verification-detail.json` — full per-row evaluation detail (only with `verify -Detail`)
+- `report-final.html` / `report-final.pptx` / `report-final.md` / `report-final.xlsx` — from `finalize`: only the findings/resources a reviewer confirmed remain open
 
 ## Safety
 
-- `run`, `consolidate`, `gaps`, `alerts`, `cost`, `tracing`, `reliability`, `security`, `performance`, `demo`, `report`, `triage` are **read-only**
+- `run`, `consolidate`, `gaps`, `alerts`, `cost`, `tracing`, `reliability`, `security`, `performance`, `demo`, `report`, `triage`, `verify`, `finalize` are **read-only** (`verify -Live` reads Azure to re-check findings but never changes any Azure resource; it only patches the local report.xlsx. `finalize` never touches Azure at all — pure local-file processing.)
 - `remediate` **defaults to dry-run** — no changes are made without `-Apply`
 - Every applied change is logged to `remediation-log.json` with before/after values
 - Remediation uses `Invoke-AzRestMethod` (ARM REST, get-then-patch) so it doesn't depend on every Az module exposing every property as a typed cmdlet parameter
