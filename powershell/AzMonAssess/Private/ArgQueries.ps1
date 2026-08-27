@@ -125,16 +125,11 @@ resources
 | project id, name, type, subscriptionId, resourceGroup, location, tags
 '@
 
-$script:AzMonQDiagnosticSettings = @'
-resources
-| where type =~ 'microsoft.insights/diagnosticsettings'
-| extend targetResourceId = tolower(tostring(properties.targetResourceId))
-| project id, name, targetResourceId,
-          workspaceId = tostring(properties.workspaceId),
-          storageAccountId = tostring(properties.storageAccountId),
-          eventHubAuthorizationRuleId = tostring(properties.eventHubAuthorizationRuleId),
-          logs = properties.logs, metrics = properties.metrics
-'@
+# NOTE: no ARG query for diagnostic settings here — microsoft.insights/
+# diagnosticSettings isn't a supported Azure Resource Graph resource type
+# (absent from the 'resources' table's microsoft.insights/* list), so
+# Get-AzMonDiagnosticSetting (Public/Get-AzMonResource.ps1) queries each
+# resource directly via ARM REST instead of a bulk ARG query.
 
 # VM extensions — used to detect the retired Log Analytics agent (MMA/OMS:
 # MicrosoftMonitoringAgent / OmsAgentForLinux) vs. Azure Monitor Agent

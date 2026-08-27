@@ -59,7 +59,7 @@ function Invoke-AzMonAssessment {
 
     Write-Host '[azmon-assess] Collecting resources + diagnostic settings...' -ForegroundColor DarkCyan
     $resources = @(Get-AzMonResource -SubscriptionId $subs | Where-Object { $null -ne $_ })
-    $diagSettings = @(Get-AzMonDiagnosticSetting -SubscriptionId $subs | Where-Object { $null -ne $_ })
+    $diagSettings = @(Get-AzMonDiagnosticSetting -ResourceRef $resources -ThrottleLimit $ThrottleLimit | Where-Object { $null -ne $_ })
     Write-Host "[azmon-assess] Found $(@($resources).Count) monitorable resource(s), $(@($diagSettings).Count) diagnostic setting(s)." -ForegroundColor DarkCyan
 
     Write-Host '[azmon-assess] Collecting VM heartbeat coverage...' -ForegroundColor DarkCyan
