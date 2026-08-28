@@ -56,6 +56,8 @@ function Add-AzMonPptxTitleSlide {
     param($Deck, [hashtable] $Snapshot)
     $slide = New-AzMonPptxSlide -Deck $Deck
     Add-AzMonPptxRect -Slide $slide -X 0 -Y 0 -Width 13.333 -Height 7.5 -ColorHex $script:AzMonPptxNavy
+    # Aspect ratio (~4.67:1) matches the source EMF's own native size.
+    Add-AzMonPptxPicture -Slide $slide -X 0.6 -Y 0.5 -Width 1.8 -Height 0.3854 -RelId 'rId2' -Name 'Microsoft logo' -Description 'Microsoft logo'
     Add-AzMonPptxRect -Slide $slide -X 0 -Y 3.0 -Width 13.333 -Height 0.06 -ColorHex $script:AzMonPptxBlue
     Add-AzMonPptxText -Slide $slide -X 0.7 -Y 2.0 -Width 12 -Height 1.2 -Text 'Azure Monitoring & Observability' -Size 44 -Bold -ColorHex $script:AzMonPptxWhite
     Add-AzMonPptxText -Slide $slide -X 0.7 -Y 3.2 -Width 12 -Height 0.8 -Text "Assessment Report — $($Snapshot['CustomerName'])" -Size 28 -ColorHex $script:AzMonPptxWhite

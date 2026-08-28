@@ -11,6 +11,10 @@ $script:AzMonSlideHeightIn = 7.5
 $script:AzMonSlideWidthEmu = 12192000
 $script:AzMonSlideHeightEmu = 6858000
 
+# Microsoft logo (white wordmark), extracted from the customer's own
+# Executive Summary brand template - used on the title slide only.
+$script:AzMonPptxMsLogoEmfBase64 = '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'
+
 function Convert-AzMonInchesToEmu {
     [CmdletBinding()]
     param([Parameter(Mandatory)] [double] $Inches)
@@ -235,6 +239,25 @@ function Add-AzMonPptxShareBar {
     }
 }
 
+function Add-AzMonPptxPicture {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $Slide,
+        [Parameter(Mandatory)] [double] $X, [Parameter(Mandatory)] [double] $Y,
+        [Parameter(Mandatory)] [double] $Width, [Parameter(Mandatory)] [double] $Height,
+        [Parameter(Mandatory)] [string] $RelId,
+        [string] $Name = 'Picture',
+        [string] $Description = ''
+    )
+    $id = Get-AzMonPptxNextId -Slide $Slide
+    $xEmu = Convert-AzMonInchesToEmu $X; $yEmu = Convert-AzMonInchesToEmu $Y
+    $cxEmu = Convert-AzMonInchesToEmu $Width; $cyEmu = Convert-AzMonInchesToEmu $Height
+    $descAttr = if ($Description) { " descr=`"$(ConvertTo-AzMonXmlText $Description)`"" } else { '' }
+    [void]$Slide.ShapeXml.Append(@"
+<p:pic><p:nvPicPr><p:cNvPr id="$id" name="$Name"$descAttr/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="$RelId"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="$xEmu" y="$yEmu"/><a:ext cx="$cxEmu" cy="$cyEmu"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>
+"@)
+}
+
 function Add-AzMonPptxTable {
     <#
     .SYNOPSIS
@@ -364,6 +387,15 @@ $script:AzMonPptxSlideRels = @'
 </Relationships>
 '@
 
+# Title slide only: adds the rId2 relationship Add-AzMonPptxPicture's logo call expects.
+$script:AzMonPptxTitleSlideRels = @'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/ms-logo-white.emf"/>
+</Relationships>
+'@
+
 function Get-AzMonPptxCoreXml {
     param([string] $Title = 'Azure Monitoring Assessment')
     $escaped = ConvertTo-AzMonXmlText $Title
@@ -400,6 +432,7 @@ function Get-AzMonPptxContentTypesXml {
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 <Default Extension="xml" ContentType="application/xml"/>
+<Default Extension="emf" ContentType="image/x-emf"/>
 <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
 <Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
 <Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>
@@ -479,6 +512,17 @@ function Write-AzMonZipEntry {
     }
 }
 
+function Write-AzMonZipEntryBytes {
+    param([Parameter(Mandatory)] $Zip, [Parameter(Mandatory)] [string] $EntryName, [Parameter(Mandatory)] [byte[]] $Bytes)
+    $entry = $Zip.CreateEntry($EntryName, [System.IO.Compression.CompressionLevel]::Optimal)
+    $stream = $entry.Open()
+    try {
+        $stream.Write($Bytes, 0, $Bytes.Length)
+    } finally {
+        $stream.Dispose()
+    }
+}
+
 function Save-AzMonPptxDeck {
     [CmdletBinding()]
     param(
@@ -509,12 +553,14 @@ function Save-AzMonPptxDeck {
             Write-AzMonZipEntry -Zip $zip -EntryName 'ppt/slideLayouts/slideLayout1.xml' -Content $script:AzMonPptxSlideLayoutXml
             Write-AzMonZipEntry -Zip $zip -EntryName 'ppt/slideLayouts/_rels/slideLayout1.xml.rels' -Content $script:AzMonPptxSlideLayoutRels
             Write-AzMonZipEntry -Zip $zip -EntryName 'ppt/theme/theme1.xml' -Content $script:AzMonPptxThemeXml
+            Write-AzMonZipEntryBytes -Zip $zip -EntryName 'ppt/media/ms-logo-white.emf' -Bytes ([Convert]::FromBase64String($script:AzMonPptxMsLogoEmfBase64))
 
             for ($i = 0; $i -lt $slideCount; $i++) {
                 $n = $i + 1
                 $slideXml = Get-AzMonPptxSlideXml -ShapeXml $Deck.Slides[$i].ShapeXml.ToString()
                 Write-AzMonZipEntry -Zip $zip -EntryName "ppt/slides/slide$n.xml" -Content $slideXml
-                Write-AzMonZipEntry -Zip $zip -EntryName "ppt/slides/_rels/slide$n.xml.rels" -Content $script:AzMonPptxSlideRels
+                $slideRels = if ($n -eq 1) { $script:AzMonPptxTitleSlideRels } else { $script:AzMonPptxSlideRels }
+                Write-AzMonZipEntry -Zip $zip -EntryName "ppt/slides/_rels/slide$n.xml.rels" -Content $slideRels
             }
         } finally {
             $zip.Dispose()
