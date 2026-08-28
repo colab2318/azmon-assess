@@ -311,9 +311,15 @@ function Add-AzMonPptxImpactedResourcesSlide {
         -X 0.7 -Y 1.5 -Width 7.6 -RowHeight 0.55 -LabelWidth 3.2
 
     Add-AzMonPptxKpiCard -Slide $slide -X 8.7 -Y 1.5 -Width 3.9 -Height 1.5 -Label 'Impacted resources' -Value ([string]$byResource.Count) -AccentColorHex $script:AzMonPptxCritical
-    $totalMonitorable = @($Snapshot['Resources']).Count + @($Snapshot['Workspaces']).Count + @($Snapshot['AppInsights']).Count
+    # Must match every collection New-AzMonResourceLookup draws from, since that's
+    # the universe $byResource's finding-ResourceIds can resolve into - excluding
+    # any of these previously under-counted the denominator and pushed pct over 100.
+    $totalMonitorable = @($Snapshot['Resources']).Count + @($Snapshot['Workspaces']).Count + @($Snapshot['AppInsights']).Count `
+        + @($Snapshot['AlertRules']).Count + @($Snapshot['ActionGroups']).Count + @($Snapshot['DataCollectionRules']).Count
     if ($totalMonitorable -gt 0) {
-        $pct = [Math]::Round(($byResource.Count / $totalMonitorable) * 100, 0)
+        # Still cap defensively: a finding can reference a subscription-level scope
+        # (e.g. missing service health alert) that isn't part of any inventory count.
+        $pct = [Math]::Min(100, [Math]::Round(($byResource.Count / $totalMonitorable) * 100, 0))
         Add-AzMonPptxText -Slide $slide -X 8.7 -Y 3.15 -Width 3.9 -Height 0.5 -Text "$pct% of $totalMonitorable inventoried resources" -Size 12 -ColorHex $script:AzMonPptxGrey
     }
 
