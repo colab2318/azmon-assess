@@ -95,6 +95,16 @@ Get-AzSubscription -TenantId <tenant-id>          # lists subscriptions in that 
 omitting both auto-discovers every subscription the signed-in identity can
 see in that tenant.
 
+## Confirm you're on the latest code
+
+If you already have a local clone (including a persistent Cloud Shell
+`clouddrive`), pull before running an assessment — this tool changes often:
+
+```powershell
+git pull origin main
+git rev-parse HEAD
+```
+
 ## Commands
 
 All commands go through `./azmon-assess.ps1 <command> [options]`.
