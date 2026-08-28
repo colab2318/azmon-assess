@@ -20,8 +20,7 @@ inventory, and WAF Reliability / Security / Performance findings — then
 renders them as **Excel**, **PowerPoint**, and **HTML** deliverables you can
 hand to a customer, plus Markdown and a JSON snapshot. The Excel workbook
 includes a resource-centric **`4.ImpactedResourcesAnalysis`** sheet (one row
-per finding × impacted resource, styled after the standard WARA/APRL expert-
-analysis workbook layout) alongside the finding-centric `Findings` sheet.
+per finding × impacted resource) alongside the finding-centric `Findings` sheet.
 
 ## Why zero-install
 
@@ -225,9 +224,8 @@ Written to `-Output` (default `./out`):
 - Excel is generated the same way — raw OOXML via `Private/XlsxBuilder.ps1`
   instead of a module like `ImportExcel`/EPPlus — so there's no dependency to
   install in a restricted environment. It includes an
-  additional `4.ImpactedResourcesAnalysis` sheet (styled after the standard
-  WARA/APRL expert-analysis workbook layout: one row per finding × impacted
-  resource).
+  additional `4.ImpactedResourcesAnalysis` sheet (one row per finding ×
+  impacted resource).
 - The HTML report is built with plain PowerShell string-building/here-strings
   (no Jinja2 available in PowerShell) instead of templating.
 - Config is environment variables + script parameters rather than a `.env` file
