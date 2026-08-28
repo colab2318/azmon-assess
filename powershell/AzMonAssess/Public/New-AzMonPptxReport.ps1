@@ -173,6 +173,9 @@ function Add-AzMonPptxImpactRecommendationsSlide {
     Add-AzMonPptxText -Slide $slide -X 0.5 -Y 1.2 -Width 2.0 -Height 0.3 -Text $Tier.ToUpperInvariant() -Size 13 -Bold -ColorHex $script:AzMonPptxWhite -Align 'ctr'
 
     $matching = @(Sort-AzMonFinding -Finding @($Snapshot['Findings'] | Where-Object { $Severity -contains $_['Severity'] }))
+    # Stable-sort on top of Sort-AzMonFinding's severity/savings order, so ties in
+    # resource count still fall back to that order instead of an arbitrary one.
+    $matching = @($matching | Sort-Object -Descending -Property @{ Expression = { @($_['ResourceIds'] | Where-Object { $_ }).Count } })
     $maxRows = 9
     $shown = @($matching | Select-Object -First $maxRows)
     $header = @('#', 'Recommendation', 'Category', 'Impacted Resources')
