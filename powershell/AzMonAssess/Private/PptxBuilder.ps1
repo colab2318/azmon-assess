@@ -76,7 +76,7 @@ function Add-AzMonPptxText {
         [Parameter(Mandatory)] [AllowEmptyString()] [string] $Text,
         [int] $Size = 18,
         [switch] $Bold,
-        [string] $ColorHex = '1F3A5F',
+        [string] $ColorHex = '091F2C',
         [ValidateSet('l', 'ctr', 'r')] [string] $Align = 'l'
     )
     $id = Get-AzMonPptxNextId -Slide $Slide
@@ -98,7 +98,7 @@ function Add-AzMonPptxBullets {
         [Parameter(Mandatory)] [double] $Width, [Parameter(Mandatory)] [double] $Height,
         [Parameter(Mandatory)] [AllowEmptyCollection()] [AllowEmptyString()] [string[]] $Bullet,
         [int] $Size = 14,
-        [string] $ColorHex = '1F3A5F'
+        [string] $ColorHex = '091F2C'
     )
     $id = Get-AzMonPptxNextId -Slide $Slide
     $xEmu = Convert-AzMonInchesToEmu $X; $yEmu = Convert-AzMonInchesToEmu $Y
@@ -125,7 +125,7 @@ function Add-AzMonPptxSlideHeader {
         [Parameter(Mandatory)] $Slide,
         [Parameter(Mandatory)] [string] $Title,
         [string] $Subtitle,
-        [string] $NavyHex = '1F3A5F', [string] $GreyHex = '64748B', [string] $WhiteHex = 'FFFFFF'
+        [string] $NavyHex = '091F2C', [string] $GreyHex = '454142', [string] $WhiteHex = 'FFFFFF'
     )
     Add-AzMonPptxRect -Slide $Slide -X 0 -Y 0 -Width $script:AzMonSlideWidthIn -Height 0.9 -ColorHex $NavyHex
     Add-AzMonPptxText -Slide $Slide -X 0.5 -Y 0.2 -Width 12 -Height 0.6 -Text $Title -Size 26 -Bold -ColorHex $WhiteHex
@@ -142,12 +142,12 @@ function Add-AzMonPptxKpiCard {
         [double] $Width = 4.0, [double] $Height = 1.6,
         [Parameter(Mandatory)] [string] $Label,
         [Parameter(Mandatory)] [string] $Value,
-        [string] $AccentColorHex = '388BFD'
+        [string] $AccentColorHex = '0078D4'
     )
     Add-AzMonPptxRect -Slide $Slide -X $X -Y $Y -Width $Width -Height $Height -ColorHex 'FFFFFF'
     Add-AzMonPptxRect -Slide $Slide -X $X -Y $Y -Width 0.15 -Height $Height -ColorHex $AccentColorHex
-    Add-AzMonPptxText -Slide $Slide -X ($X + 0.4) -Y ($Y + 0.2) -Width ($Width - 0.6) -Height 0.4 -Text $Label.ToUpperInvariant() -Size 11 -Bold -ColorHex '64748B'
-    Add-AzMonPptxText -Slide $Slide -X ($X + 0.4) -Y ($Y + 0.5) -Width ($Width - 0.6) -Height 1.0 -Text $Value -Size 32 -Bold -ColorHex '1F3A5F'
+    Add-AzMonPptxText -Slide $Slide -X ($X + 0.4) -Y ($Y + 0.2) -Width ($Width - 0.6) -Height 0.4 -Text $Label.ToUpperInvariant() -Size 11 -Bold -ColorHex '454142'
+    Add-AzMonPptxText -Slide $Slide -X ($X + 0.4) -Y ($Y + 0.5) -Width ($Width - 0.6) -Height 1.0 -Text $Value -Size 32 -Bold -ColorHex '091F2C'
 }
 
 # ---- pseudo-chart primitives (rectangles, no native chart parts) -------
@@ -167,11 +167,11 @@ function Add-AzMonPptxHBarChart {
     $barAreaWidth = $Width - $LabelWidth - 0.9
     for ($i = 0; $i -lt $Category.Count; $i++) {
         $rowY = $Y + ($i * $RowHeight)
-        $color = if ($ColorHex -and $ColorHex[$i]) { $ColorHex[$i] } else { '388BFD' }
-        Add-AzMonPptxText -Slide $Slide -X $X -Y ($rowY + 0.05) -Width $LabelWidth -Height ($RowHeight - 0.1) -Text $Category[$i] -Size 13 -Bold -ColorHex '1F3A5F'
+        $color = if ($ColorHex -and $ColorHex[$i]) { $ColorHex[$i] } else { '0078D4' }
+        Add-AzMonPptxText -Slide $Slide -X $X -Y ($rowY + 0.05) -Width $LabelWidth -Height ($RowHeight - 0.1) -Text $Category[$i] -Size 13 -Bold -ColorHex '091F2C'
         $barWidth = [Math]::Max(0.05, ($Value[$i] / $max) * $barAreaWidth)
         Add-AzMonPptxRect -Slide $Slide -X ($X + $LabelWidth) -Y ($rowY + 0.1) -Width $barWidth -Height ($RowHeight - 0.3) -ColorHex $color
-        Add-AzMonPptxText -Slide $Slide -X ($X + $LabelWidth + $barWidth + 0.1) -Y ($rowY + 0.05) -Width 0.9 -Height ($RowHeight - 0.1) -Text ([string]$Value[$i]) -Size 13 -Bold -ColorHex '1F3A5F'
+        Add-AzMonPptxText -Slide $Slide -X ($X + $LabelWidth + $barWidth + 0.1) -Y ($rowY + 0.05) -Width 0.9 -Height ($RowHeight - 0.1) -Text ([string]$Value[$i]) -Size 13 -Bold -ColorHex '091F2C'
     }
 }
 
@@ -181,7 +181,7 @@ function Add-AzMonPptxVBarChart {
         [Parameter(Mandatory)] $Slide,
         [Parameter(Mandatory)] [string[]] $Category,
         [Parameter(Mandatory)] [double[]] $Value,
-        [string] $ColorHex = '388BFD',
+        [string] $ColorHex = '0078D4',
         [double] $X = 0.7, [double] $Y = 1.4, [double] $Width = 11.9, [double] $Height = 4.6,
         [string[]] $ValueLabel
     )
@@ -197,8 +197,8 @@ function Add-AzMonPptxVBarChart {
         $barY = $Y + ($Height - $barHeight)
         Add-AzMonPptxRect -Slide $Slide -X $colX -Y $barY -Width $barWidth -Height $barHeight -ColorHex $ColorHex
         $label = if ($ValueLabel -and $ValueLabel[$i]) { $ValueLabel[$i] } else { [string]$Value[$i] }
-        Add-AzMonPptxText -Slide $Slide -X ($X + ($i * $colWidth)) -Y ($barY - 0.35) -Width $colWidth -Height 0.3 -Text $label -Size 12 -Bold -ColorHex '1F3A5F' -Align 'ctr'
-        Add-AzMonPptxText -Slide $Slide -X ($X + ($i * $colWidth)) -Y ($Y + $Height + 0.05) -Width $colWidth -Height 0.7 -Text $Category[$i] -Size 11 -ColorHex '64748B' -Align 'ctr'
+        Add-AzMonPptxText -Slide $Slide -X ($X + ($i * $colWidth)) -Y ($barY - 0.35) -Width $colWidth -Height 0.3 -Text $label -Size 12 -Bold -ColorHex '091F2C' -Align 'ctr'
+        Add-AzMonPptxText -Slide $Slide -X ($X + ($i * $colWidth)) -Y ($Y + $Height + 0.05) -Width $colWidth -Height 0.7 -Text $Category[$i] -Size 11 -ColorHex '454142' -Align 'ctr'
     }
 }
 
@@ -231,7 +231,7 @@ function Add-AzMonPptxShareBar {
         $rowY = $legendY + ($i * 0.45)
         Add-AzMonPptxRect -Slide $Slide -X $X -Y ($rowY + 0.05) -Width 0.25 -Height 0.25 -ColorHex $ColorHex[$i]
         $pct = [Math]::Round(($Value[$i] / $total) * 100, 1)
-        Add-AzMonPptxText -Slide $Slide -X ($X + 0.35) -Y $rowY -Width 8 -Height 0.4 -Text "$($Category[$i]): $($Value[$i])  ($pct%)" -Size 14 -ColorHex '1F3A5F'
+        Add-AzMonPptxText -Slide $Slide -X ($X + 0.35) -Y $rowY -Width 8 -Height 0.4 -Text "$($Category[$i]): $($Value[$i])  ($pct%)" -Size 14 -ColorHex '091F2C'
     }
 }
 
@@ -254,9 +254,9 @@ function Add-AzMonPptxTable {
         [double] $RowHeight = 0.42,
         [int] $HeaderSize = 12,
         [int] $RowSize = 11,
-        [string] $HeaderFillHex = '1F3A5F',
+        [string] $HeaderFillHex = '091F2C',
         [string] $HeaderFontHex = 'FFFFFF',
-        [string] $AltRowFillHex = 'EEF2F7'
+        [string] $AltRowFillHex = 'E8E6DF'
     )
     $totalWidth = ($ColumnWidth | Measure-Object -Sum).Sum
     Add-AzMonPptxRect -Slide $Slide -X $X -Y $Y -Width $totalWidth -Height $HeaderHeight -ColorHex $HeaderFillHex
@@ -274,7 +274,7 @@ function Add-AzMonPptxTable {
         $cells = @($Row[$r])
         for ($c = 0; $c -lt $Header.Count; $c++) {
             $val = if ($c -lt $cells.Count) { [string]$cells[$c] } else { '' }
-            Add-AzMonPptxText -Slide $Slide -X ($cx + 0.06) -Y ($rowY + 0.03) -Width ($ColumnWidth[$c] - 0.12) -Height ($RowHeight - 0.05) -Text $val -Size $RowSize -ColorHex '1F3A5F'
+            Add-AzMonPptxText -Slide $Slide -X ($cx + 0.06) -Y ($rowY + 0.03) -Width ($ColumnWidth[$c] - 0.12) -Height ($RowHeight - 0.05) -Text $val -Size $RowSize -ColorHex '091F2C'
             $cx += $ColumnWidth[$c]
         }
         $rowY += $RowHeight
@@ -332,20 +332,20 @@ $script:AzMonPptxThemeXml = @'
 <a:clrScheme name="AzMon">
 <a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1>
 <a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>
-<a:dk2><a:srgbClr val="1F3A5F"/></a:dk2>
-<a:lt2><a:srgbClr val="E7E6E6"/></a:lt2>
-<a:accent1><a:srgbClr val="388BFD"/></a:accent1>
-<a:accent2><a:srgbClr val="EF4444"/></a:accent2>
-<a:accent3><a:srgbClr val="F59E0B"/></a:accent3>
-<a:accent4><a:srgbClr val="3B82F6"/></a:accent4>
-<a:accent5><a:srgbClr val="10B981"/></a:accent5>
-<a:accent6><a:srgbClr val="6B7280"/></a:accent6>
-<a:hlink><a:srgbClr val="0563C1"/></a:hlink>
-<a:folHlink><a:srgbClr val="954F72"/></a:folHlink>
+<a:dk2><a:srgbClr val="091F2C"/></a:dk2>
+<a:lt2><a:srgbClr val="E8E6DF"/></a:lt2>
+<a:accent1><a:srgbClr val="0078D4"/></a:accent1>
+<a:accent2><a:srgbClr val="F4364F"/></a:accent2>
+<a:accent3><a:srgbClr val="FF5C39"/></a:accent3>
+<a:accent4><a:srgbClr val="49C5B1"/></a:accent4>
+<a:accent5><a:srgbClr val="07641D"/></a:accent5>
+<a:accent6><a:srgbClr val="454142"/></a:accent6>
+<a:hlink><a:srgbClr val="091F2C"/></a:hlink>
+<a:folHlink><a:srgbClr val="091F2C"/></a:folHlink>
 </a:clrScheme>
 <a:fontScheme name="AzMon">
-<a:majorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>
-<a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>
+<a:majorFont><a:latin typeface="Segoe Sans Text Semibold"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>
+<a:minorFont><a:latin typeface="Segoe Sans Text"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>
 </a:fontScheme>
 <a:fmtScheme name="AzMon">
 <a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst>

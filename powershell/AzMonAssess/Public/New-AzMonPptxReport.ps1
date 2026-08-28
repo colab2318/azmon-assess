@@ -3,15 +3,17 @@
 # dependency-free Private/PptxBuilder.ps1 (rectangles/text instead of native
 # chart parts, so no Office install / COM / external library is required).
 
-$script:AzMonPptxNavy = '1F3A5F'
-$script:AzMonPptxBlue = '388BFD'
-$script:AzMonPptxCritical = 'EF4444'
-$script:AzMonPptxHigh = 'F59E0B'
-$script:AzMonPptxMedium = '3B82F6'
-$script:AzMonPptxLow = '10B981'
-$script:AzMonPptxInfo = '6B7280'
+# Brand palette matches the customer's real exec-summary template theme
+# (Segoe Sans Text, Microsoft brand colors) - see PptxBuilder.ps1's theme XML.
+$script:AzMonPptxNavy = '091F2C'
+$script:AzMonPptxBlue = '0078D4'
+$script:AzMonPptxCritical = 'F4364F'
+$script:AzMonPptxHigh = 'FF5C39'
+$script:AzMonPptxMedium = '49C5B1'
+$script:AzMonPptxLow = '07641D'
+$script:AzMonPptxInfo = '454142'
 $script:AzMonPptxWhite = 'FFFFFF'
-$script:AzMonPptxGrey = '64748B'
+$script:AzMonPptxGrey = '454142'
 $script:AzMonPptxSevColor = @{
     critical = $script:AzMonPptxCritical
     high     = $script:AzMonPptxHigh
