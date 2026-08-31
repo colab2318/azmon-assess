@@ -16,6 +16,27 @@
 # inline string so later reads never depend on a possibly-stale
 # sharedStrings.xml.
 
+function Assert-AzMonXlsxPackage {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Path)
+
+    $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+    try {
+        $signature = [byte[]]::new(8)
+        $bytesRead = $stream.Read($signature, 0, $signature.Length)
+    } finally {
+        $stream.Dispose()
+    }
+
+    $signatureHex = (($signature | ForEach-Object { $_.ToString('X2') }) -join '')
+    if ($bytesRead -ge 8 -and $signatureHex -eq 'D0CF11E0A1B11AE1') {
+        throw "Workbook '$Path' is an encrypted or legacy binary Office file, not a readable .xlsx package. In Excel, remove password or sensitivity-label encryption if permitted, then use Save As > Excel Workbook (*.xlsx) and retry. Renaming the extension is not sufficient."
+    }
+    if ($bytesRead -lt 2 -or $signature[0] -ne 0x50 -or $signature[1] -ne 0x4B) {
+        throw "Workbook '$Path' is not a valid .xlsx package. Save it from Excel as Excel Workbook (*.xlsx), ensure the save completes, and retry."
+    }
+}
+
 function Read-AzMonZipEntryText {
     [CmdletBinding()]
     param([Parameter(Mandatory)] $Entry)
@@ -166,6 +187,7 @@ function Get-AzMonExcelReviewStatus {
         [string] $StatusColumnHeader = 'REQUIRED ACTIONS / REVIEW STATUS'
     )
     if (-not (Test-Path -LiteralPath $Path)) { throw "Report not found: $Path" }
+    Assert-AzMonXlsxPackage -Path $Path
     Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
     Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
 
@@ -239,6 +261,7 @@ function Update-AzMonExcelReviewStatus {
     $applied = [System.Collections.Generic.List[hashtable]]::new()
     if (-not $StatusUpdate -or $StatusUpdate.Count -eq 0) { return $applied.ToArray() }
     if (-not (Test-Path -LiteralPath $Path)) { throw "Report not found: $Path" }
+    Assert-AzMonXlsxPackage -Path $Path
     Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
     Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
 
