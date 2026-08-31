@@ -18,6 +18,50 @@ cd powershell
 ./azmon-assess.ps1 run  -Output ./out   # full assessment across every subscription you can see
 ```
 
+## Scope the assessment
+
+By default, `run` assesses every enabled subscription the signed-in identity
+can access in the current tenant. Use `-SubscriptionId` or
+`-ManagementGroupId` to target a smaller scope.
+
+Confirm the active tenant and available subscriptions before starting:
+
+```powershell
+Get-AzContext
+Get-AzSubscription -TenantId <tenant-id>
+```
+
+Run against one subscription:
+
+```powershell
+cd powershell
+./azmon-assess.ps1 run -SubscriptionId <subscription-id> -Output ./out
+```
+
+Run against multiple subscriptions by supplying a comma-separated list:
+
+```powershell
+./azmon-assess.ps1 run -SubscriptionId <subscription-id-1>,<subscription-id-2>,<subscription-id-3> -Output ./out
+```
+
+Run against every accessible subscription beneath a management group. Child
+management groups are expanded recursively:
+
+```powershell
+./azmon-assess.ps1 run -ManagementGroupId <management-group-id> -Output ./out
+```
+
+For a different tenant, include `-TenantId` with either scope:
+
+```powershell
+./azmon-assess.ps1 run -TenantId <tenant-id> -SubscriptionId <subscription-id-1>,<subscription-id-2> -Output ./out
+./azmon-assess.ps1 run -TenantId <tenant-id> -ManagementGroupId <management-group-id> -Output ./out
+```
+
+Explicit `-SubscriptionId` values take precedence over
+`-ManagementGroupId`. The signed-in identity must have at least Reader and
+Log Analytics Reader access across the selected scope.
+
 ## What it does
 
 | Capability | Concern addressed |
